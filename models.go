@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"log"
 
 	"github.com/go-webauthn/webauthn/webauthn"
@@ -69,7 +67,6 @@ func (this *User) UpdateCredential(credential *webauthn.Credential) {
 type PasskeyStore interface {
 	GetOrCreateUser(username string) PasskeyUser
 	SaveUser(PasskeyUser)
-	GenSessionID() (string, error)
 	GetSession(token string) (*webauthn.SessionData, bool)
 	SaveSession(token string, data *webauthn.SessionData)
 	DeleteSession(token string)
@@ -79,17 +76,6 @@ type InMem struct {
 	// TODO: it would be nice to have a mutex here
 	users    map[string]PasskeyUser
 	sessions map[string]*webauthn.SessionData
-}
-
-func (this *InMem) GenSessionID() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-
-	return base64.URLEncoding.EncodeToString(b), nil
-
 }
 
 func NewInMem() *InMem {
@@ -132,6 +118,6 @@ func (this *InMem) GetOrCreateUser(username string) PasskeyUser {
 
 func (this *InMem) SaveUser(user PasskeyUser) {
 	log.Printf("[DEBUG] SaveUser: %v", user.WebAuthnName())
-	log.Printf("[DEBUG] SaveUser: %v", user)
+	// log.Printf("[DEBUG] SaveUser: %v", user)
 	this.users[user.WebAuthnName()] = user
 }

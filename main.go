@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -46,19 +48,20 @@ func main() {
 
 	log.Printf("[INFO] register routes")
 	// Serve the web files
-	http.Handle("/", http.FileServer(http.Dir("./web")))
+	mux := http.NewServeMux()
+	mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	// Add auth the routes
-	http.HandleFunc("/api/passkey/registerStart", BeginRegistration)
-	http.HandleFunc("/api/passkey/registerFinish", FinishRegistration)
-	http.HandleFunc("/api/passkey/loginStart", BeginLogin)
-	http.HandleFunc("/api/passkey/loginFinish", FinishLogin)
+	mux.HandleFunc("/api/passkey/registerStart", BeginRegistration)
+	mux.HandleFunc("/api/passkey/registerFinish", FinishRegistration)
+	mux.HandleFunc("/api/passkey/loginStart", BeginLogin)
+	mux.HandleFunc("/api/passkey/loginFinish", FinishLogin)
 
-	http.Handle("/private", LoggedInMiddleware(http.HandlerFunc(PrivatePage)))
+	mux.Handle("/private", LoggedInMiddleware(http.HandlerFunc(PrivatePage)))
 
 	// Start the server
 	log.Printf("[INFO] start server at %s", origin)
-	if err := http.ListenAndServe(port, nil); err != nil {
+	if err := http.ListenAndServe(port, mux); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -93,18 +96,13 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make a session key and store the sessionData values
-	t, err := datastore.GenSessionID()
-	if err != nil {
-		log.Printf("[ERRO] can't generate session id: %s", err.Error())
+	token := GenSessionID()
 
-		panic(err) // FIXME: handle error
-	}
-
-	datastore.SaveSession(t, session)
+	datastore.SaveSession(token, session)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    t,
+		Value:    token,
 		Path:     "api/passkey/registerStart",
 		MaxAge:   3600,
 		Secure:   true,
@@ -180,17 +178,12 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make a session key and store the sessionData values
-	t, err := datastore.GenSessionID()
-	if err != nil {
-		log.Printf("[ERRO] can't generate session id: %s", err.Error())
-
-		panic(err) // TODO: handle error
-	}
-	datastore.SaveSession(t, session)
+	token := GenSessionID()
+	datastore.SaveSession(token, session)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    t,
+		Value:    token,
 		Path:     "api/passkey/loginStart",
 		MaxAge:   3600,
 		Secure:   true,
@@ -239,19 +232,14 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Add the new session cookie
-	t, err := datastore.GenSessionID()
-	if err != nil {
-		log.Printf("[ERRO] can't generate session id: %s", err.Error())
+	token := GenSessionID()
 
-		panic(err) // TODO: handle error
-	}
-
-	datastore.SaveSession(t, &webauthn.SessionData{
+	datastore.SaveSession(token, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    t,
+		Value:    token,
 		Path:     "/",
 		MaxAge:   3600,
 		Secure:   true,
@@ -329,4 +317,10 @@ func LoggedInMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func GenSessionID() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return base64.URLEncoding.EncodeToString(b)
 }
