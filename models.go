@@ -1,6 +1,8 @@
 package main
 
 import (
+	"sync"
+
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -11,11 +13,12 @@ import (
 ///////////////////////
 
 type PasskeyUser struct { // implements webauthn.User
-	ID          []byte
-	DisplayName string
-	Name        string
-	Email       string
-	creds       []webauthn.Credential
+	ID          []byte                `json:"id"` // must be set to a unique value for each user
+	DisplayName string                `json:"display_name"`
+	Name        string                `json:"name"`
+	Email       string                `json:"email"`
+	Creds       []webauthn.Credential `json:"credentials"`
+	credsMutex  sync.RWMutex
 }
 
 func (this *PasskeyUser) WebAuthnID() []byte {
@@ -34,22 +37,35 @@ func (this *PasskeyUser) WebAuthnDisplayName() string {
 	return this.DisplayName
 }
 
-func (this *PasskeyUser) WebAuthnIcon() string {
-	return "https://pics.com/avatar.png"
-}
-
 func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
-	return this.creds
+	this.credsMutex.RLock()
+	defer this.credsMutex.RUnlock()
+	return this.Creds
 }
 
 func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
-	this.creds = append(this.creds, *credential)
+	this.credsMutex.Lock()
+	defer this.credsMutex.Unlock()
+	this.Creds = append(this.Creds, *credential)
 }
 
 func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
-	for i, c := range this.creds {
+	this.credsMutex.Lock()
+	defer this.credsMutex.Unlock()
+	for i, c := range this.Creds {
 		if string(c.ID) == string(credential.ID) {
-			this.creds[i] = *credential
+			this.Creds[i] = *credential
+		}
+	}
+}
+
+func (this *PasskeyUser) RemoveCredential(credentialID []byte) {
+	this.credsMutex.Lock()
+	defer this.credsMutex.Unlock()
+	for i, c := range this.Creds {
+		if string(c.ID) == string(credentialID) {
+			this.Creds = append(this.Creds[:i], this.Creds[i+1:]...)
+			return
 		}
 	}
 }
@@ -61,43 +77,49 @@ func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 ////////////////////////
 
 type PasskeyStore struct {
-	// TODO: it would be nice to have a mutex here
-	users    map[string]*PasskeyUser
-	sessions map[string]*webauthn.SessionData
+	users    sync.Map
+	sessions sync.Map
 }
 
-func NewInMem() *PasskeyStore {
+func New() *PasskeyStore {
 	return &PasskeyStore{
-		users:    make(map[string]*PasskeyUser),
-		sessions: make(map[string]*webauthn.SessionData),
+		users:    sync.Map{},
+		sessions: sync.Map{},
 	}
 }
 
 func (this *PasskeyStore) GetSession(sessionID string) *webauthn.SessionData {
-	return this.sessions[sessionID]
+	if v, ok := this.sessions.Load(sessionID); ok {
+		if session, ok := v.(*webauthn.SessionData); ok {
+			return session
+		}
+	}
+	return nil
 }
 
 func (this *PasskeyStore) SaveSession(sessionID string, data *webauthn.SessionData) {
-	this.sessions[sessionID] = data
+	this.sessions.Store(sessionID, data)
 }
 
 func (this *PasskeyStore) DeleteSession(sessionID string) {
-	delete(this.sessions, sessionID)
+	this.sessions.Delete(sessionID)
 }
 
 func (this *PasskeyStore) GetOrCreateUser(username string) *PasskeyUser {
-	user := this.users[username]
-	if user == nil {
-		user = &PasskeyUser{
-			ID:          []byte(username),
-			DisplayName: username,
-			Name:        username,
+	if v, ok := this.users.Load(username); ok {
+		if user, ok := v.(*PasskeyUser); ok {
+			return user
 		}
-		this.users[username] = user
 	}
+	user := &PasskeyUser{
+		ID:          []byte(username),
+		DisplayName: username,
+		Name:        username,
+	}
+	this.users.Store(username, user)
 	return user
 }
 
 func (this *PasskeyStore) SaveUser(user *PasskeyUser) {
-	this.users[user.WebAuthnName()] = user
+	this.users.Store(user.WebAuthnName(), user)
 }

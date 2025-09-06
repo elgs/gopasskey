@@ -13,7 +13,7 @@ import (
 
 var webAuthn *webauthn.WebAuthn
 var err error
-var datastore *PasskeyStore
+var passkeyStore *PasskeyStore
 
 func main() {
 	proto := getEnv("PROTO", "http")
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	log.Printf("[INFO] create datastore")
-	datastore = NewInMem()
+	passkeyStore = New()
 
 	log.Printf("[INFO] register routes")
 	// Serve the web files
@@ -95,7 +95,7 @@ func LoggedInMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		session := datastore.GetSession(sid.Value)
+		session := passkeyStore.GetSession(sid.Value)
 		if session == nil {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 

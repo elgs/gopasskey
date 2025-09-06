@@ -24,7 +24,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := datastore.GetOrCreateUser(username)
+	user := passkeyStore.GetOrCreateUser(username)
 
 	options, session, err := webAuthn.BeginRegistration(user)
 	if err != nil {
@@ -35,7 +35,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID := GenSessionID()
-	datastore.SaveSession(sessionID, session)
+	passkeyStore.SaveSession(sessionID, session)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
 		Value:    sessionID,
@@ -66,10 +66,10 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the session data stored from the function above
-	session := datastore.GetSession(sid.Value)
+	session := passkeyStore.GetSession(sid.Value)
 
 	// In out example username == userID, but in real world it should be different
-	user := datastore.GetOrCreateUser(string(session.UserID))
+	user := passkeyStore.GetOrCreateUser(string(session.UserID))
 
 	credential, err := webAuthn.FinishRegistration(user, *session, r)
 	if err != nil {
@@ -86,8 +86,8 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.AddCredential(credential)
-	datastore.SaveUser(user)
-	datastore.DeleteSession(sid.Value)
+	passkeyStore.SaveUser(user)
+	passkeyStore.DeleteSession(sid.Value)
 	http.SetCookie(w, &http.Cookie{
 		Name:  "sid",
 		Value: "",
@@ -113,7 +113,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := datastore.GetOrCreateUser(username) // Find the user
+	user := passkeyStore.GetOrCreateUser(username) // Find the user
 
 	options, session, err := webAuthn.BeginLogin(user)
 	if err != nil {
@@ -125,7 +125,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := GenSessionID()
-	datastore.SaveSession(sessionID, session)
+	passkeyStore.SaveSession(sessionID, session)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
 		Value:    sessionID,
@@ -155,10 +155,10 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Get the session data stored from the function above
-	session := datastore.GetSession(sid.Value)
+	session := passkeyStore.GetSession(sid.Value)
 
 	// In out example username == userID, but in real world it should be different
-	user := datastore.GetOrCreateUser(string(session.UserID)) // Get the user
+	user := passkeyStore.GetOrCreateUser(string(session.UserID)) // Get the user
 
 	credential, err := webAuthn.FinishLogin(user, *session, r)
 	if err != nil {
@@ -174,10 +174,10 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	// If login was successful, update the credential object
 	user.UpdateCredential(credential)
-	datastore.SaveUser(user)
+	passkeyStore.SaveUser(user)
 
 	// Delete the login session data
-	datastore.DeleteSession(sid.Value)
+	passkeyStore.DeleteSession(sid.Value)
 	http.SetCookie(w, &http.Cookie{
 		Name:  "sid",
 		Value: "",
@@ -186,7 +186,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	// Add the new session cookie
 	sessionID := GenSessionID()
 
-	datastore.SaveSession(sessionID, &webauthn.SessionData{
+	passkeyStore.SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
 	})
 	http.SetCookie(w, &http.Cookie{
@@ -212,7 +212,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	datastore.DeleteSession(sid.Value)
+	passkeyStore.DeleteSession(sid.Value)
 	http.SetCookie(w, &http.Cookie{
 		Name:  "sid",
 		Value: "",
