@@ -1,6 +1,6 @@
 module github.com/elgs/go-passkey
 
-go 1.25.0
+go 1.25.1
 
 require github.com/go-webauthn/webauthn v0.13.4
 

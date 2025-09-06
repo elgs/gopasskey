@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
@@ -12,45 +10,43 @@ import (
 //                   //
 ///////////////////////
 
-type PasskeyUser interface {
-	webauthn.User
-	AddCredential(*webauthn.Credential)
-	UpdateCredential(*webauthn.Credential)
-}
-
-type User struct {
+type PasskeyUser struct { // implements webauthn.User
 	ID          []byte
 	DisplayName string
 	Name        string
-
-	creds []webauthn.Credential
+	Email       string
+	creds       []webauthn.Credential
 }
 
-func (this *User) WebAuthnID() []byte {
+func (this *PasskeyUser) WebAuthnID() []byte {
 	return this.ID
 }
 
-func (this *User) WebAuthnName() string {
+func (this *PasskeyUser) WebAuthnName() string {
 	return this.Name
 }
 
-func (this *User) WebAuthnDisplayName() string {
+func (this *PasskeyUser) WebAuthnEmail() string {
+	return this.Email
+}
+
+func (this *PasskeyUser) WebAuthnDisplayName() string {
 	return this.DisplayName
 }
 
-func (this *User) WebAuthnIcon() string {
+func (this *PasskeyUser) WebAuthnIcon() string {
 	return "https://pics.com/avatar.png"
 }
 
-func (this *User) WebAuthnCredentials() []webauthn.Credential {
+func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
 	return this.creds
 }
 
-func (this *User) AddCredential(credential *webauthn.Credential) {
+func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
 	this.creds = append(this.creds, *credential)
 }
 
-func (this *User) UpdateCredential(credential *webauthn.Credential) {
+func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 	for i, c := range this.creds {
 		if string(c.ID) == string(credential.ID) {
 			this.creds[i] = *credential
@@ -64,60 +60,45 @@ func (this *User) UpdateCredential(credential *webauthn.Credential) {
 //                    //
 ////////////////////////
 
-type PasskeyStore interface {
-	GetOrCreateUser(username string) PasskeyUser
-	SaveUser(PasskeyUser)
-	GetSession(token string) (*webauthn.SessionData, bool)
-	SaveSession(token string, data *webauthn.SessionData)
-	DeleteSession(token string)
-}
-
-type InMem struct {
+type PasskeyStore struct {
 	// TODO: it would be nice to have a mutex here
-	users    map[string]PasskeyUser
+	users    map[string]*PasskeyUser
 	sessions map[string]*webauthn.SessionData
 }
 
-func NewInMem() *InMem {
-	return &InMem{
-		users:    make(map[string]PasskeyUser),
+func NewInMem() *PasskeyStore {
+	return &PasskeyStore{
+		users:    make(map[string]*PasskeyUser),
 		sessions: make(map[string]*webauthn.SessionData),
 	}
 }
 
-func (this *InMem) GetSession(token string) (*webauthn.SessionData, bool) {
-	log.Printf("[DEBUG] GetSession: %v", this.sessions[token])
-	val, ok := this.sessions[token]
-
-	return val, ok
+func (this *PasskeyStore) GetSession(token string) *webauthn.SessionData {
+	return this.sessions[token]
 }
 
-func (this *InMem) SaveSession(token string, data *webauthn.SessionData) {
-	log.Printf("[DEBUG] SaveSession: %s - %v", token, data)
+func (this *PasskeyStore) SaveSession(token string, data *webauthn.SessionData) {
 	this.sessions[token] = data
 }
 
-func (this *InMem) DeleteSession(token string) {
-	log.Printf("[DEBUG] DeleteSession: %v", token)
+func (this *PasskeyStore) DeleteSession(token string) {
 	delete(this.sessions, token)
 }
 
-func (this *InMem) GetOrCreateUser(username string) PasskeyUser {
-	log.Printf("[DEBUG] GetOrCreateUser: %v", username)
-	if _, ok := this.users[username]; !ok {
-		log.Printf("[DEBUG] GetOrCreateUser: creating new user: %v", username)
-		this.users[username] = &User{
+func (this *PasskeyStore) GetOrCreateUser(username string) *PasskeyUser {
+	user := this.users[username]
+	if user == nil {
+		user = &PasskeyUser{
 			ID:          []byte(username),
 			DisplayName: username,
 			Name:        username,
 		}
+		this.users[username] = user
 	}
-
-	return this.users[username]
+	return user
 }
 
-func (this *InMem) SaveUser(user PasskeyUser) {
-	log.Printf("[DEBUG] SaveUser: %v", user.WebAuthnName())
+func (this *PasskeyStore) SaveUser(user *PasskeyUser) {
 	// log.Printf("[DEBUG] SaveUser: %v", user)
 	this.users[user.WebAuthnName()] = user
 }
