@@ -24,7 +24,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := datastore.GetOrCreateUser(username) // Find or create the new user
+	user := datastore.GetOrCreateUser(username)
 
 	options, session, err := webAuthn.BeginRegistration(user)
 	if err != nil {
@@ -34,19 +34,16 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Make a session key and store the sessionData values
-	token := GenSessionID()
-
-	datastore.SaveSession(token, session)
-
+	sessionID := GenSessionID()
+	datastore.SaveSession(sessionID, session)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    token,
-		Path:     "api/passkey/registerStart",
+		Value:    sessionID,
+		Path:     "/api/passkey/registerFinish",
 		MaxAge:   3600,
 		Secure:   true,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, // TODO: SameSiteStrictMode maybe?
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	JSONResponse(w, options, http.StatusOK) // return the options generated with the session key
@@ -72,7 +69,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	session := datastore.GetSession(sid.Value)
 
 	// In out example username == userID, but in real world it should be different
-	user := datastore.GetOrCreateUser(string(session.UserID)) // Get the user
+	user := datastore.GetOrCreateUser(string(session.UserID))
 
 	credential, err := webAuthn.FinishRegistration(user, *session, r)
 	if err != nil {
@@ -127,17 +124,16 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make a session key and store the sessionData values
-	token := GenSessionID()
-	datastore.SaveSession(token, session)
-
+	sessionID := GenSessionID()
+	datastore.SaveSession(sessionID, session)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    token,
-		Path:     "api/passkey/loginStart",
+		Value:    sessionID,
+		Path:     "/api/passkey/loginFinish",
 		MaxAge:   3600,
 		Secure:   true,
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode, // TODO: SameSiteStrictMode maybe?
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	JSONResponse(w, options, http.StatusOK) // return the options generated with the session key
@@ -188,14 +184,14 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Add the new session cookie
-	token := GenSessionID()
+	sessionID := GenSessionID()
 
-	datastore.SaveSession(token, &webauthn.SessionData{
+	datastore.SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name:     "sid",
-		Value:    token,
+		Value:    sessionID,
 		Path:     "/",
 		MaxAge:   3600,
 		Secure:   true,
@@ -205,4 +201,22 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] finish login ----------------------/")
 	JSONResponse(w, "Login Success", http.StatusOK)
+}
+
+// logout
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	sid, err := r.Cookie("sid")
+	if err != nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	datastore.DeleteSession(sid.Value)
+	http.SetCookie(w, &http.Cookie{
+		Name:  "sid",
+		Value: "",
+	})
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

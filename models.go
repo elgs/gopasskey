@@ -73,16 +73,16 @@ func NewInMem() *PasskeyStore {
 	}
 }
 
-func (this *PasskeyStore) GetSession(token string) *webauthn.SessionData {
-	return this.sessions[token]
+func (this *PasskeyStore) GetSession(sessionID string) *webauthn.SessionData {
+	return this.sessions[sessionID]
 }
 
-func (this *PasskeyStore) SaveSession(token string, data *webauthn.SessionData) {
-	this.sessions[token] = data
+func (this *PasskeyStore) SaveSession(sessionID string, data *webauthn.SessionData) {
+	this.sessions[sessionID] = data
 }
 
-func (this *PasskeyStore) DeleteSession(token string) {
-	delete(this.sessions, token)
+func (this *PasskeyStore) DeleteSession(sessionID string) {
+	delete(this.sessions, sessionID)
 }
 
 func (this *PasskeyStore) GetOrCreateUser(username string) *PasskeyUser {
@@ -99,6 +99,5 @@ func (this *PasskeyStore) GetOrCreateUser(username string) *PasskeyUser {
 }
 
 func (this *PasskeyStore) SaveUser(user *PasskeyUser) {
-	// log.Printf("[DEBUG] SaveUser: %v", user)
 	this.users[user.WebAuthnName()] = user
 }

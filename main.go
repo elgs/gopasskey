@@ -48,6 +48,7 @@ func main() {
 	mux.HandleFunc("/api/passkey/registerFinish", FinishRegistration)
 	mux.HandleFunc("/api/passkey/loginStart", BeginLogin)
 	mux.HandleFunc("/api/passkey/loginFinish", FinishLogin)
+	mux.HandleFunc("/api/passkey/logout", Logout)
 
 	mux.Handle("/private", LoggedInMiddleware(http.HandlerFunc(PrivatePage)))
 

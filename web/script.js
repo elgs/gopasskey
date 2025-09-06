@@ -92,3 +92,21 @@ async function login() {
         showMessage('Error: ' + error.message, true);
     }
 }
+
+async function logout() {
+    try {
+        const response = await fetch('/api/passkey/logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const msg = await response.json();
+        if (response.ok) {
+            showMessage(msg, false);
+        } else {
+            showMessage(msg, true);
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, true);
+    }
+}
