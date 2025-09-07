@@ -1,12 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -57,57 +55,4 @@ func main() {
 	if err := http.ListenAndServe(port, mux); err != nil {
 		fmt.Println(err)
 	}
-}
-
-func PrivatePage(w http.ResponseWriter, r *http.Request) {
-	// just show "Hello, World!" for now
-	_, _ = w.Write([]byte("Hello, World!"))
-}
-
-// JSONResponse is a helper function to send json response
-func JSONResponse(w http.ResponseWriter, data any, status int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(data)
-}
-
-// getUsername is a helper function to extract the username from json request
-func getUsername(r *http.Request) (string, error) {
-	type Username struct {
-		Username string `json:"username"`
-	}
-	var u Username
-	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-		return "", err
-	}
-
-	return u.Username, nil
-}
-
-func LoggedInMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: url to redirect to should be passed as a parameter
-
-		sid, err := r.Cookie("sid")
-		if err != nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-
-			return
-		}
-
-		session := passkeyStore.GetSession(sid.Value)
-		if session == nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-
-			return
-		}
-
-		if session.Expires.Before(time.Now()) {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

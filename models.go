@@ -101,8 +101,19 @@ func (this *PasskeyStore) SaveSession(sessionID string, data *webauthn.SessionDa
 	this.sessions.Store(sessionID, data)
 }
 
+func printSyncMap(m *sync.Map) {
+	count := 0
+	m.Range(func(key, value any) bool {
+		count++
+		return true
+	})
+	println("SyncMap has", count, "entries")
+}
+
 func (this *PasskeyStore) DeleteSession(sessionID string) {
+	// printSyncMap(&this.sessions)
 	this.sessions.Delete(sessionID)
+	// printSyncMap(&this.sessions)
 }
 
 func (this *PasskeyStore) GetOrCreateUser(username string) *PasskeyUser {
