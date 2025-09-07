@@ -19,40 +19,36 @@ func main() {
 	port := getEnv("PORT", ":8080")
 	origin := fmt.Sprintf("%s://%s%s", proto, host, port)
 
-	log.Printf("[INFO] make webauthn config")
 	wconfig := &webauthn.Config{
-		RPDisplayName: "Go Webauthn",    // Display Name for your site
-		RPID:          host,             // Generally the FQDN for your site
-		RPOrigins:     []string{origin}, // The origin URLs allowed for WebAuthn
+		RPDisplayName: "Go Webauthn",                             // Display Name for your site
+		RPID:          host,                                      // Generally the FQDN for your site
+		RPOrigins:     []string{origin, "http://localhost:2020"}, // The origin URLs allowed for WebAuthn
 	}
 
-	log.Printf("[INFO] create webauthn")
 	webAuthn, err = webauthn.New(wconfig)
 	if err != nil {
 		fmt.Printf("[FATA] %s", err.Error())
 		os.Exit(1)
 	}
 
-	log.Printf("[INFO] create datastore")
 	passkeyStore = New()
 
-	log.Printf("[INFO] register routes")
 	// Serve the web files
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	// mux.Handle("/", http.FileServer(http.Dir("./web")))
 
 	// Add auth the routes
-	mux.HandleFunc("/api/passkey/registerStart", BeginRegistration)
-	mux.HandleFunc("/api/passkey/registerFinish", FinishRegistration)
-	mux.HandleFunc("/api/passkey/loginStart", BeginLogin)
-	mux.HandleFunc("/api/passkey/loginFinish", FinishLogin)
-	mux.HandleFunc("/api/passkey/logout", Logout)
+	mux.HandleFunc("/api/passkey/registerStart", CORS(BeginRegistration))
+	mux.HandleFunc("/api/passkey/registerFinish", CORS(FinishRegistration))
+	mux.HandleFunc("/api/passkey/loginStart", CORS(BeginLogin))
+	mux.HandleFunc("/api/passkey/loginFinish", CORS(FinishLogin))
+	mux.HandleFunc("/api/passkey/logout", CORS(Logout))
 
-	mux.Handle("/private", LoggedInMiddleware(http.HandlerFunc(PrivatePage)))
+	mux.HandleFunc("/api/passkey/private", CORS(LoggedInMiddleware(Private)))
 
 	// Start the server
 	log.Printf("[INFO] start server at %s", origin)
 	if err := http.ListenAndServe(port, mux); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 }

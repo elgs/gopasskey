@@ -1,0 +1,10 @@
+{
+  "name": "web",
+  "version": "3.0.6",
+  "components": [
+    "root"
+  ],
+  "resources": [
+    "resources/"
+  ]
+}

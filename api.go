@@ -37,15 +37,8 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := GenSessionID()
 	passkeyStore.SaveSession(sessionID, session)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "register_sid",
-		Value:    sessionID,
-		Path:     "/api/passkey/registerFinish",
-		MaxAge:   3600,
-		Secure:   true,
-		HttpOnly: true,
-	})
-
+	w.Header().Add("Access-Control-Expose-Headers", "register_sid")
+	w.Header().Set("register_sid", sessionID)
 	JSONResponse(w, options, http.StatusOK) // return the options generated with the session key
 	// options.publicKey contain our registration options
 }
@@ -57,27 +50,16 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////
 
 func FinishRegistration(w http.ResponseWriter, r *http.Request) {
-	// defer delete register_sid cookie
-	defer func() {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "register_sid",
-			Value:    "",
-			Path:     "/api/passkey/registerFinish",
-			MaxAge:   -1,
-			Secure:   true,
-			HttpOnly: true,
-		})
-	}()
-	// Get the session key from cookie
-	sid, err := r.Cookie("register_sid")
-	if err != nil {
+	// read register_sid from header
+	sid := r.Header.Get("register_sid")
+	if sid == "" {
 		log.Printf("[ERRO] can't get session id: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// Get the session data stored from the function above
-	session := passkeyStore.GetSession(sid.Value)
+	session := passkeyStore.GetSession(sid)
 
 	// In out example username == userID, but in real world it should be different
 	user := passkeyStore.GetOrCreateUser(string(session.UserID))
@@ -92,7 +74,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 
 	user.AddCredential(credential)
 	passkeyStore.SaveUser(user)
-	passkeyStore.DeleteSession(sid.Value)
+	passkeyStore.DeleteSession(sid)
 	log.Printf("[INFO] finish registration ----------------------/")
 	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
 }
@@ -126,15 +108,8 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	// Make a session key and store the sessionData values
 	sessionID := GenSessionID()
 	passkeyStore.SaveSession(sessionID, session)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "login_sid",
-		Value:    sessionID,
-		Path:     "/api/passkey/loginFinish",
-		MaxAge:   3600,
-		Secure:   true,
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-	})
+	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
+	w.Header().Set("login_sid", sessionID)
 
 	JSONResponse(w, options, http.StatusOK) // return the options generated with the session key
 	// options.publicKey contain our registration options
@@ -147,25 +122,14 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 ///////////////////////
 
 func FinishLogin(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		http.SetCookie(w, &http.Cookie{
-			Name:     "login_sid",
-			Value:    "",
-			Path:     "/api/passkey/loginFinish",
-			MaxAge:   -1,
-			Secure:   true,
-			HttpOnly: true,
-		})
-	}()
-	// Get the session key from cookie
-	sid, err := r.Cookie("login_sid")
-	if err != nil {
+	sid := r.Header.Get("login_sid")
+	if sid == "" {
 		log.Printf("[ERRO] can't get session id: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	// Get the session data stored from the function above
-	session := passkeyStore.GetSession(sid.Value)
+	session := passkeyStore.GetSession(sid)
 
 	// In out example username == userID, but in real world it should be different
 	user := passkeyStore.GetOrCreateUser(string(session.UserID)) // Get the user
@@ -187,22 +151,14 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	passkeyStore.SaveUser(user)
 
 	// Delete the login session data
-	passkeyStore.DeleteSession(sid.Value)
-	// Add the new session cookie
+	passkeyStore.DeleteSession(sid)
 	sessionID := GenSessionID()
 
 	passkeyStore.SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
 	})
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
-		Value:    sessionID,
-		Path:     "/",
-		MaxAge:   3600,
-		Secure:   true,
-		HttpOnly: true,
-	})
-	log.Println(sid, session)
+
+	w.Header().Set("sid", sessionID)
 
 	log.Printf("[INFO] finish login ----------------------/")
 	JSONResponse(w, "Login Success", http.StatusOK)
@@ -215,59 +171,60 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 //////////////////
 
 func Logout(w http.ResponseWriter, r *http.Request) {
-	sid, err := r.Cookie("sid")
-	if err != nil {
-		log.Printf("[ERRO] can't get session id: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
+	sid := r.Header.Get("sid")
+	if sid == "" {
+		log.Printf("[ERRO] can't get session id")
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	log.Println("Logging out session", sid)
-	passkeyStore.DeleteSession(sid.Value)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		Secure:   true,
-		HttpOnly: true,
-	})
-
+	passkeyStore.DeleteSession(sid)
 	JSONResponse(w, "Logout Success", http.StatusOK)
 }
 
-func LoggedInMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+///////////////////
+//               //
+//    Private    //
+//               //
+///////////////////
+
+func Private(w http.ResponseWriter, r *http.Request) {
+	JSONResponse(w, "This is a private page", http.StatusOK)
+}
+
+///////////////////////
+//                   //
+//    Middlewares    //
+//                   //
+///////////////////////
+
+func LoggedInMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: url to redirect to should be passed as a parameter
 
-		sid, err := r.Cookie("sid")
-		if err != nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+		sid := r.Header.Get("sid")
+		if sid == "" {
+			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] can't get session id")
 			return
 		}
 
-		session := passkeyStore.GetSession(sid.Value)
+		session := passkeyStore.GetSession(sid)
 		if session == nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] can't get session")
 			return
 		}
 
 		if session.Expires.Before(time.Now()) {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] session expired")
 			return
 		}
-		log.Println(sid, session)
 
 		next.ServeHTTP(w, r)
-	})
-}
-
-func PrivatePage(w http.ResponseWriter, r *http.Request) {
-	// just show "Hello, World!" for now
-	_, _ = w.Write([]byte("Hello, World!"))
+	}
 }
 
 // JSONResponse is a helper function to send json response
@@ -288,4 +245,20 @@ func getUsername(r *http.Request) (string, error) {
 	}
 
 	return u.Username, nil
+}
+
+func CORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Access-Control-Allow-Origin", "*")
+		w.Header().Add("Access-Control-Allow-Headers", "*")
+		w.Header().Add("Access-Control-Expose-Headers", "sid")
+		// w.Header().Add("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			w.Header().Set("Allow", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
+			return
+		}
+
+		next(w, r)
+	}
 }
