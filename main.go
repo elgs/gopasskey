@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -10,14 +11,29 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/redis/go-redis/v9"
 )
 
+var host = getEnv("HOST", "")
+var port = getEnv("PORT", "")
+var rpName = getEnv("RP_NAME", "")
+var origins = getEnv("ORIGINS", "")
+var redisURL = getEnv("REDIS_URL", "localhost:6379")
+var dbUser = getEnv("DB_USER", "")
+var dbPassword = getEnv("DB_PASSWORD", "")
+var dbHost = getEnv("DB_HOST", "")
+var dbPort = getEnv("DB_PORT", "")
+var dbName = getEnv("DB_NAME", "")
+
+var ctx = context.Background() // go's ugliest thing
 var err error
 var webAuthn *webauthn.WebAuthn
-var passkeyStore *PasskeyStore
 var db *sql.DB
+var redisClient *redis.Client
 
 func main() {
+	initRedis()
+	defer redisClient.Close()
 	initDB()
 	defer db.Close()
 	initPasskeyStore()
@@ -25,14 +41,11 @@ func main() {
 }
 
 func initApiServer() {
-	host := os.Getenv("HOST")
-	port := os.Getenv("PORT")
-
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/passkey/registerStart", CORS(BeginRegistration))
-	mux.HandleFunc("/api/passkey/registerFinish", CORS(FinishRegistration))
-	mux.HandleFunc("/api/passkey/loginStart", CORS(BeginLogin))
-	mux.HandleFunc("/api/passkey/loginFinish", CORS(FinishLogin))
+	mux.HandleFunc("/api/passkey/register_start", CORS(BeginRegistration))
+	mux.HandleFunc("/api/passkey/register_finish", CORS(FinishRegistration))
+	mux.HandleFunc("/api/passkey/login_start", CORS(BeginLogin))
+	mux.HandleFunc("/api/passkey/login_finish", CORS(FinishLogin))
 	mux.HandleFunc("/api/passkey/logout", CORS(Logout))
 	mux.HandleFunc("/api/passkey/private", CORS(LoggedInMiddleware(Private)))
 
@@ -42,9 +55,6 @@ func initApiServer() {
 }
 
 func initPasskeyStore() {
-	rpName := os.Getenv("RP_NAME")
-	host := os.Getenv("HOST")
-	origins := os.Getenv("ORIGINS")
 	wconfig := &webauthn.Config{
 		RPDisplayName: rpName,                      // Display Name for your site
 		RPID:          host,                        // Generally the FQDN for your site
@@ -55,17 +65,10 @@ func initPasskeyStore() {
 		fmt.Printf("[FATA] %s", err.Error())
 		os.Exit(1)
 	}
-	passkeyStore = NewPasskeyStore()
 }
 
 func initDB() {
 	var err error
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbName := os.Getenv("DB_NAME")
-
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", dbUser, dbPassword, dbHost, dbPort, dbName)
 	db, err = sql.Open("mysql", dsn)
 	if err != nil {
@@ -79,4 +82,11 @@ func initDB() {
 	}
 
 	fmt.Println("[INFO] connected to database")
+}
+
+func initRedis() {
+	redisOpts := &redis.Options{
+		Addr: redisURL,
+	}
+	redisClient = redis.NewClient(redisOpts)
 }

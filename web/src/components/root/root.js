@@ -23,7 +23,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get registration options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}registerStart`, {
+        const response = await fetch(`${api_url}register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
@@ -48,7 +48,7 @@ customElements.define('web-root',
         // A new attestation is created. This also means a new public-private-key pair is created.
         const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options.publicKey });
         // Send attestationResponse back to server for verification and storage.
-        const verificationResponse = await fetch(`${api_url}registerFinish`, {
+        const verificationResponse = await fetch(`${api_url}register_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'register_sid': registerSid },
           body: JSON.stringify(attestationResponse)
@@ -70,7 +70,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}loginStart`, {
+        const response = await fetch(`${api_url}login_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -95,7 +95,7 @@ customElements.define('web-root',
         const assertionResponse = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options.publicKey });
 
         // Send assertionResponse back to server for verification.
-        const verificationResponse = await fetch(`${api_url}loginFinish`, {
+        const verificationResponse = await fetch(`${api_url}login_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'login_sid': loginSid },
           body: JSON.stringify(assertionResponse)

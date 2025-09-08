@@ -131,12 +131,12 @@ func (this *PasskeyUser) RemoveCredential(credentialID []byte) {
 //                          //
 //////////////////////////////
 
-type PasskeyUserSession struct {
-	ID      string          `json:"id" db:"id" pk:"true"`
-	UserID  string          `json:"user_id" db:"user_id"`
-	Session json.RawMessage `json:"session" db:"session"`
-	Created time.Time       `json:"created" db:"created"`
-}
+// type PasskeyUserSession struct {
+// 	ID      string          `json:"id" db:"id" pk:"true"`
+// 	UserID  string          `json:"user_id" db:"user_id"`
+// 	Session json.RawMessage `json:"session" db:"session"`
+// 	Created time.Time       `json:"created" db:"created"`
+// }
 
 /////////////////////////////////
 //                             //
@@ -158,25 +158,15 @@ type PasskeyUserCredential struct {
 //                    //
 ////////////////////////
 
-type PasskeyStore struct {
-}
-
-func NewPasskeyStore() *PasskeyStore {
-	return &PasskeyStore{}
-}
-
-func (this *PasskeyStore) GetSession(sessionID string) (*webauthn.SessionData, error) {
-	session := &PasskeyUserSession{
-		ID: sessionID,
-	}
-	err := gosqlcrud.Retrieve(db, session, "user_session")
+func GetSession(sessionID string) (*webauthn.SessionData, error) {
+	val, err := redisClient.Get(ctx, fmt.Sprintf("passkey_session:%s", sessionID)).Result()
 	if err != nil {
 		return nil, err
 	}
 
-	if session.Session != nil {
+	if val != "" {
 		var data webauthn.SessionData
-		err := json.Unmarshal(session.Session, &data)
+		err := json.Unmarshal([]byte(val), &data)
 		if err != nil {
 			return nil, err
 		}
@@ -185,42 +175,29 @@ func (this *PasskeyStore) GetSession(sessionID string) (*webauthn.SessionData, e
 	return nil, fmt.Errorf("session not found")
 }
 
-func (this *PasskeyStore) SaveSession(sessionID string, data *webauthn.SessionData, userDBID string) error {
-	sessionJSON, err := json.Marshal(data)
+func SaveSession(sessionID string, data *webauthn.SessionData, userDBID string) error {
+	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	session := &PasskeyUserSession{
-		ID:      sessionID,
-		UserID:  userDBID,
-		Session: sessionJSON,
-		Created: time.Now(),
-	}
-	result, err := gosqlcrud.Create(db, session, "user_session")
+	val, err := redisClient.Set(ctx, fmt.Sprintf("passkey_session:%s", sessionID), dataJSON, time.Hour).Result()
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("no rows affected")
-	}
+	log.Printf("Save session result: %s", val)
 	return nil
 }
 
-func (this *PasskeyStore) DeleteSession(sessionID string) error {
-	session := &PasskeyUserSession{
-		ID: sessionID,
-	}
-	result, err := gosqlcrud.Delete(db, session, "user_session")
+func DeleteSession(sessionID string) error {
+	val, err := redisClient.Del(ctx, fmt.Sprintf("passkey_session:%s", sessionID)).Result()
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("no rows affected")
-	}
+	log.Printf("Delete session result: %d", val)
 	return nil
 }
 
-func (this *PasskeyStore) CreateUser(email, name, displayName string) (*PasskeyUser, error) {
+func CreateUser(email, name, displayName string) (*PasskeyUser, error) {
 	id := uuid.New().String()
 	user := &PasskeyUser{
 		ID:          []byte(id),
@@ -245,7 +222,7 @@ func (this *PasskeyStore) CreateUser(email, name, displayName string) (*PasskeyU
 	return user, nil
 }
 
-func (this *PasskeyStore) GetUser(id []byte) (*PasskeyUser, error) {
+func GetUser(id []byte) (*PasskeyUser, error) {
 	log.Printf("Getting user with ID: %s", string(id))
 	user := &PasskeyUser{
 		DB_ID: string(id),
@@ -258,7 +235,7 @@ func (this *PasskeyStore) GetUser(id []byte) (*PasskeyUser, error) {
 	return user, nil
 }
 
-func (this *PasskeyStore) GetUserByEmail(email string) (*PasskeyUser, error) {
+func GetUserByEmail(email string) (*PasskeyUser, error) {
 	users := []PasskeyUser{}
 	err := gosqlcrud.QueryToStructs(db, &users, "SELECT * FROM user WHERE email = ?", email)
 	if err != nil {
@@ -273,7 +250,7 @@ func (this *PasskeyStore) GetUserByEmail(email string) (*PasskeyUser, error) {
 	return nil, fmt.Errorf("user not found")
 }
 
-func (this *PasskeyStore) SaveUser(user *PasskeyUser) error {
+func SaveUser(user *PasskeyUser) error {
 	result, err := gosqlcrud.Update(db, user, "user")
 	if err != nil {
 		return err

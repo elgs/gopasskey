@@ -27,7 +27,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := passkeyStore.CreateUser(u.Email, u.Name, u.DisplayName)
+	user, err := CreateUser(u.Email, u.Name, u.DisplayName)
 	if err != nil {
 		msg := fmt.Sprintf("can't create user: %s", err.Error())
 		log.Printf("[ERRO] %s", msg)
@@ -46,7 +46,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID := uuid.New().String()
-	err = passkeyStore.SaveSession(sessionID, session, user.DB_ID)
+	err = SaveSession(sessionID, session, user.DB_ID)
 	if err != nil {
 		log.Printf("[ERRO] can't save session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -73,14 +73,14 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := passkeyStore.GetSession(registerSid)
+	session, err := GetSession(registerSid)
 	if err != nil {
 		log.Printf("[ERRO] can't get session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user, err := passkeyStore.GetUser(session.UserID)
+	user, err := GetUser(session.UserID)
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -96,8 +96,8 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.AddCredential(credential)
-	passkeyStore.SaveUser(user)
-	passkeyStore.DeleteSession(registerSid)
+	SaveUser(user)
+	DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
 	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
 
@@ -122,7 +122,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := passkeyStore.GetUserByEmail(u.Email) // Find the user
+	user, err := GetUserByEmail(u.Email) // Find the user
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -139,7 +139,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := uuid.New().String()
-	passkeyStore.SaveSession(sessionID, session, user.DB_ID)
+	SaveSession(sessionID, session, user.DB_ID)
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -161,7 +161,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Get the session data stored from the function above
-	session, err := passkeyStore.GetSession(loginSid)
+	session, err := GetSession(loginSid)
 	if err != nil {
 		log.Printf("[ERRO] can't get session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -169,7 +169,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// In out example username == userID, but in real world it should be different
-	user, err := passkeyStore.GetUser(session.UserID)
+	user, err := GetUser(session.UserID)
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -190,13 +190,13 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	// If login was successful, update the credential object
 	user.UpdateCredential(credential)
-	passkeyStore.SaveUser(user)
+	SaveUser(user)
 
 	// Delete the login session data
-	passkeyStore.DeleteSession(loginSid)
+	DeleteSession(loginSid)
 	sessionID := uuid.New().String()
 
-	passkeyStore.SaveSession(sessionID, &webauthn.SessionData{
+	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
 	}, user.DB_ID)
 
@@ -221,7 +221,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("Logging out session", sid)
-	passkeyStore.DeleteSession(sid)
+	DeleteSession(sid)
 	JSONResponse(w, "Logout Success", http.StatusOK)
 }
 
@@ -252,7 +252,7 @@ func LoggedInMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		session, err := passkeyStore.GetSession(sid)
+		session, err := GetSession(sid)
 		if err != nil {
 			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] can't get session")
