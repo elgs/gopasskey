@@ -1,16 +1,230 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/elgs/gosqlcrud"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 )
+
+// GetUserCredentials returns credential IDs for a user as base64url strings
+func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
+	req := &Req{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+	user, err := GetUserByEmail(req.Email)
+	if err != nil {
+		JSONResponse(w, "User not found", http.StatusNotFound)
+		return
+	}
+	creds := user.WebAuthnCredentials()
+	var credentialIds []string
+	for _, cred := range creds {
+		credentialIds = append(credentialIds, base64URLEncode(cred.ID))
+	}
+	JSONResponse(w, map[string]interface{}{"credentialIds": credentialIds}, http.StatusOK)
+}
+
+// Helper to encode []byte to base64url (no padding)
+func base64URLEncode(b []byte) string {
+	s := ""
+	if len(b) > 0 {
+		s = base64.RawURLEncoding.EncodeToString(b)
+	}
+	return s
+}
+
+///////////////////////
+//                   //
+//    BeginSignup    //
+//                   //
+///////////////////////
+
+func BeginSignup(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] begin sign up ----------------------\\")
+	u, err := getUserData(r)
+	if err != nil {
+		log.Printf("[ERRO] can't get user name: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Check if user already exists
+	existingUser, err := GetUserByEmail(u.Email)
+	if err == nil && existingUser != nil {
+		msg := fmt.Sprintf("user with email %s already exists", u.Email)
+		log.Printf("[ERRO] %s", msg)
+		JSONResponse(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
+	verificationCode := uuid.New().String()
+	redisClient.Set(ctx, fmt.Sprintf("passkey_signup_code:%s", verificationCode), fmt.Sprintf("%s|%s|%s", u.Email, u.Name, u.DisplayName), time.Minute*10)
+
+	// Log the verification code to the console (for testing purposes only)
+	log.Printf("[INFO] verification code: %s", verificationCode)
+
+	// Send the verification code to the user's email
+	err = SendMail(u.Email, "Your verification code", fmt.Sprintf("Your verification code is: %s", verificationCode))
+	if err != nil {
+		log.Printf("[ERRO] can't send verification email: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	JSONResponse(w, "Verification code sent to email", http.StatusOK)
+
+}
+
+////////////////////////
+//                    //
+//    FinishSignup    //
+//                    //
+////////////////////////
+
+func FinishSignup(w http.ResponseWriter, r *http.Request) {
+	req := &Req{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the verification code is valid
+	val, err := redisClient.Get(ctx, fmt.Sprintf("passkey_signup_code:%s", req.Code)).Result()
+	if err != nil {
+		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
+		return
+	}
+
+	// Parse the user data from the Redis value
+	parts := strings.Split(val, "|")
+	if len(parts) != 3 {
+		JSONResponse(w, "Invalid verification code data", http.StatusBadRequest)
+		return
+	}
+	u := &PasskeyUser{
+		Email:       parts[0],
+		Name:        parts[1],
+		DisplayName: parts[2],
+	}
+
+	if u.Email != req.Email {
+		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
+		return
+	}
+
+	_, err = CreateUser(u.Email, u.Name, u.DisplayName)
+	if err != nil {
+		msg := fmt.Sprintf("can't create user: %s", err.Error())
+		log.Printf("[ERRO] %s", msg)
+		JSONResponse(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	// Delete the signup code
+	redisClient.Del(ctx, fmt.Sprintf("passkey_signup_code:%s", req.Code))
+
+	JSONResponse(w, "Signup successful", http.StatusOK)
+
+	log.Printf("[INFO] finish sign up ----------------------/")
+}
+
+//////////////////////////////
+//                          //
+//    BeginLoginWithCode    //
+//                          //
+//////////////////////////////
+
+func BeginLoginWithCode(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] begin login with code ----------------------\\")
+
+	u, err := getUserData(r)
+	if err != nil {
+		log.Printf("[ERRO]can't get user name: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	user, err := GetUserByEmail(u.Email) // Find the user
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
+	verificationCode := uuid.New().String()
+	redisClient.Set(ctx, fmt.Sprintf("passkey_login_code:%s", verificationCode), user.DB_ID, time.Minute*10)
+
+	// Log the verification code to the console (for testing purposes only)
+	log.Printf("[INFO] login verification code: %s", verificationCode)
+
+	// Send the verification code to the user's email
+	err = SendMail(u.Email, "Your login verification code", fmt.Sprintf("Your login verification code is: %s", verificationCode))
+	if err != nil {
+		log.Printf("[ERRO] can't send verification email: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	JSONResponse(w, "Login verification code sent to email", http.StatusOK) // return the options generated with the session key
+	// options.publicKey contain our registration options
+}
+
+///////////////////////////////
+//                           //
+//    FinishLoginWithCode    //
+//                           //
+///////////////////////////////
+
+func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
+	req := &Req{}
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the verification code is valid
+	userDBID, err := redisClient.Get(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code)).Result()
+	if err != nil {
+		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
+		return
+	}
+
+	user, err := GetUser([]byte(userDBID))
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if user.Email != req.Email {
+		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
+		return
+	}
+
+	// create a session for the user
+	sessionID := uuid.New().String()
+	SaveSession(sessionID, &webauthn.SessionData{
+		Expires: time.Now().Add(time.Hour),
+	}, user.DB_ID, time.Hour) // save session for 1 hour
+	w.Header().Set("sid", sessionID)
+
+	// Delete the login code
+	redisClient.Del(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code))
+
+	JSONResponse(w, "Login successful", http.StatusOK)
+
+	log.Printf("[INFO] finish login with code ----------------------/")
+}
 
 /////////////////////////////
 //                         //
@@ -20,18 +234,18 @@ import (
 
 func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] begin registration ----------------------\\")
+
 	u, err := getUserData(r)
 	if err != nil {
-		log.Printf("[ERRO] can't get user name: %s", err.Error())
+		log.Printf("[ERRO]can't get user name: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user, err := CreateUser(u.Email, u.Name, u.DisplayName)
+	user, err := GetUserByEmail(u.Email) // Find the user
 	if err != nil {
-		msg := fmt.Sprintf("can't create user: %s", err.Error())
-		log.Printf("[ERRO] %s", msg)
-		JSONResponse(w, msg, http.StatusBadRequest)
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -46,7 +260,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID := uuid.New().String()
-	err = SaveSession(sessionID, session, user.DB_ID)
+	err = SaveSession(sessionID, session, user.DB_ID, time.Minute*5) // save session for 5 minutes
 	if err != nil {
 		log.Printf("[ERRO] can't save session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -96,7 +310,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.AddCredential(credential)
-	SaveUser(user)
+	// SaveUser(user)
 	DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
 	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
@@ -139,7 +353,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := uuid.New().String()
-	SaveSession(sessionID, session, user.DB_ID)
+	SaveSession(sessionID, session, user.DB_ID, time.Minute*5) // save session for 5 minutes
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -190,17 +404,18 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	// If login was successful, update the credential object
 	user.UpdateCredential(credential)
-	SaveUser(user)
+	// SaveUser(user)
 
 	// Delete the login session data
 	DeleteSession(loginSid)
-	sessionID := uuid.New().String()
 
+	/////////////////////////////////////////////////////////////////
+	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	}, user.DB_ID)
-
+	}, user.DB_ID, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
+	/////////////////////////////////////////////////////////////////
 
 	log.Printf("[INFO] finish login ----------------------/")
 	JSONResponse(w, "Login Success", http.StatusOK)

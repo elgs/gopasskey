@@ -9,17 +9,110 @@ customElements.define('web-root',
       super(ast);
     }
 
-    email = 'qc@az.ht';
+    email = 'i@az.ht';
     name = 'Qian Chen';
     displayName = 'Qian';
     message = '';
+    vCode = '';
 
-    // derived from LWElement
     domReady() {
       // console.log('Dom is ready');
     }
 
-    async register() {
+    async startSignup() {
+      try {
+        // Get signup options from your server. Here, we also receive the challenge.
+        const response = await fetch(`${api_url}signup_start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
+        });
+
+        // Check if the signup options are ok.
+        if (!response.ok) {
+          const msg = await response.json();
+          throw new Error('User already exists or failed to get signup options from server: ' + msg);
+        }
+
+        const msg = await response.json();
+        this.message = msg;
+      } catch (error) {
+        this.message = 'Error: ' + error.message;
+      }
+    }
+
+    async finishSignup() {
+      try {
+        // Get signup options from your server. Here, we also receive the challenge.
+        const response = await fetch(`${api_url}signup_finish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.email, code: this.vCode })
+        });
+
+        // Check if the signup options are ok.
+        if (!response.ok) {
+          const msg = await response.json();
+          throw new Error('Failed to finish signup on server: ' + msg);
+        }
+
+        const msg = await response.json();
+        this.message = msg;
+      } catch (error) {
+        this.message = 'Error: ' + error.message;
+      }
+    }
+
+    async startLoginWithCode() {
+      try {
+        // Get login options from your server. Here, we also receive the challenge.
+        const response = await fetch(`${api_url}login_with_code_start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.email })
+        });
+
+        // Check if the login options are ok.
+        if (!response.ok) {
+          const msg = await response.json();
+          throw new Error('Failed to get login options from server: ' + msg);
+        }
+
+        const msg = await response.json();
+        this.message = msg;
+      } catch (error) {
+        this.message = 'Error: ' + error.message;
+      }
+    }
+
+    async finishLoginWithCode() {
+      try {
+        // Get login options from your server. Here, we also receive the challenge.
+        const response = await fetch(`${api_url}login_with_code_finish`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.email, code: this.vCode })
+        });
+
+        // Check if the login options are ok.
+        if (!response.ok) {
+          const msg = await response.json();
+          throw new Error('Failed to finish login with code on server: ' + msg);
+        }
+
+        const sid = response.headers.get('sid');
+        if (sid) {
+          localStorage.setItem('sid', sid);
+        }
+
+        const msg = await response.json();
+        this.message = msg;
+      } catch (error) {
+        this.message = 'Error: ' + error.message;
+      }
+    }
+
+    async registerPasskey() {
       // Retrieve the username from the input field
       try {
         // Get registration options from your server. Here, we also receive the challenge.
@@ -54,7 +147,6 @@ customElements.define('web-root',
           body: JSON.stringify(attestationResponse)
         });
 
-
         const msg = await verificationResponse.json();
         if (verificationResponse.ok) {
           this.message = msg;
@@ -66,7 +158,7 @@ customElements.define('web-root',
       }
     }
 
-    async login() {
+    async loginWithPasskey() {
       // Retrieve the username from the input field
       try {
         // Get login options from your server. Here, we also receive the challenge.
@@ -153,6 +245,25 @@ customElements.define('web-root',
         const msg = await response.json();
         if (response.ok) {
           this.message = msg;
+        } else {
+          this.message = 'Error: ' + msg;
+        }
+      } catch (error) {
+        this.message = 'Error: ' + error.message;
+      }
+    }
+
+    async getUserCredentials() {
+      try {
+        const response = await fetch(`${api_url}credentials`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: this.email })
+        });
+
+        const msg = await response.json();
+        if (response.ok) {
+          this.message = JSON.stringify(msg);
         } else {
           this.message = 'Error: ' + msg;
         }

@@ -8,6 +8,14 @@
 <br>
 <input type="text" placeholder="Display Name" lw-model="displayName">
 <br>
-<button lw-on:click="register()">Register</button>
-<button lw-on:click="login()">Login</button>
+<input type="text" placeholder="Verification Code" lw-model="vCode">
+<br>
+<button lw-on:click="startSignup()">Sign Up</button>
+<button lw-on:click="finishSignup()">Finish Sign Up</button>
+<button lw-on:click="startLoginWithCode()">Login with Code</button>
+<button lw-on:click="finishLoginWithCode()">Finish Login with Code</button>
+<br>
+<button lw-on:click="registerPasskey()">Register Passkey</button>
+<button lw-on:click="loginWithPasskey()">Login with Passkey</button>
 <button lw-on:click="logout()">Logout</button>
+<button lw-on:click="getUserCredentials()">Get User Credentials</button>

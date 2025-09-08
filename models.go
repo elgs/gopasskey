@@ -26,7 +26,6 @@ type PasskeyUser struct { // implements webauthn.User
 	Balance     float64   `json:"balance" db:"balance"`
 	Created     time.Time `json:"created" db:"created"`
 	Status      string    `json:"status" db:"status"`
-	IsVerified  bool      `json:"is_verified" db:"is_verified"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
 	IsDeleted   bool      `json:"is_deleted" db:"is_deleted"`
 }
@@ -125,18 +124,10 @@ func (this *PasskeyUser) RemoveCredential(credentialID []byte) {
 	}
 }
 
-//////////////////////////////
-//                          //
-//    PasskeyUserSession    //
-//                          //
-//////////////////////////////
-
-// type PasskeyUserSession struct {
-// 	ID      string          `json:"id" db:"id" pk:"true"`
-// 	UserID  string          `json:"user_id" db:"user_id"`
-// 	Session json.RawMessage `json:"session" db:"session"`
-// 	Created time.Time       `json:"created" db:"created"`
-// }
+type Req struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
 
 /////////////////////////////////
 //                             //
@@ -175,12 +166,12 @@ func GetSession(sessionID string) (*webauthn.SessionData, error) {
 	return nil, fmt.Errorf("session not found")
 }
 
-func SaveSession(sessionID string, data *webauthn.SessionData, userDBID string) error {
+func SaveSession(sessionID string, data *webauthn.SessionData, userDBID string, ttl time.Duration) error {
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	val, err := redisClient.Set(ctx, fmt.Sprintf("passkey_session:%s", sessionID), dataJSON, time.Hour).Result()
+	val, err := redisClient.Set(ctx, fmt.Sprintf("passkey_session:%s", sessionID), dataJSON, ttl).Result()
 	if err != nil {
 		return err
 	}
@@ -208,7 +199,6 @@ func CreateUser(email, name, displayName string) (*PasskeyUser, error) {
 		Balance:     0,
 		Created:     time.Now(),
 		Status:      "",
-		IsVerified:  false,
 		IsActive:    true,
 		IsDeleted:   false,
 	}
