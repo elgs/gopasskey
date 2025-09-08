@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"fmt"
 	"net/smtp"
 	"os"
@@ -16,12 +14,6 @@ func getEnv(key, def string) string {
 	}
 
 	return def
-}
-
-func GenSessionID() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
 }
 
 func SendMail(to, subject, body string) error {

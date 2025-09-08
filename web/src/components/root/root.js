@@ -9,7 +9,9 @@ customElements.define('web-root',
       super(ast);
     }
 
-    username = '';
+    email = 'qc@az.ht';
+    name = 'Qian Chen';
+    displayName = 'Qian';
     message = '';
 
     // derived from LWElement
@@ -24,7 +26,7 @@ customElements.define('web-root',
         const response = await fetch(`${api_url}registerStart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: this.username })
+          body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
         });
 
         // Check if the registration options are ok.
@@ -71,7 +73,7 @@ customElements.define('web-root',
         const response = await fetch(`${api_url}loginStart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: this.username })
+          body: JSON.stringify({ email: this.email })
         });
         // Check if the login options are ok.
         if (!response.ok) {

@@ -1,54 +1,82 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
 
-var webAuthn *webauthn.WebAuthn
 var err error
+var webAuthn *webauthn.WebAuthn
 var passkeyStore *PasskeyStore
+var db *sql.DB
 
 func main() {
-	proto := getEnv("PROTO", "http")
-	host := getEnv("HOST", "localhost")
-	port := getEnv("PORT", ":8080")
-	origin := fmt.Sprintf("%s://%s%s", proto, host, port)
+	initDB()
+	defer db.Close()
+	initPasskeyStore()
+	initApiServer()
+}
 
-	wconfig := &webauthn.Config{
-		RPDisplayName: "Go Webauthn",                             // Display Name for your site
-		RPID:          host,                                      // Generally the FQDN for your site
-		RPOrigins:     []string{origin, "http://localhost:2020"}, // The origin URLs allowed for WebAuthn
-	}
+func initApiServer() {
+	host := os.Getenv("HOST")
+	port := os.Getenv("PORT")
 
-	webAuthn, err = webauthn.New(wconfig)
-	if err != nil {
-		fmt.Printf("[FATA] %s", err.Error())
-		os.Exit(1)
-	}
-
-	passkeyStore = New()
-
-	// Serve the web files
 	mux := http.NewServeMux()
-	// mux.Handle("/", http.FileServer(http.Dir("./web")))
-
-	// Add auth the routes
 	mux.HandleFunc("/api/passkey/registerStart", CORS(BeginRegistration))
 	mux.HandleFunc("/api/passkey/registerFinish", CORS(FinishRegistration))
 	mux.HandleFunc("/api/passkey/loginStart", CORS(BeginLogin))
 	mux.HandleFunc("/api/passkey/loginFinish", CORS(FinishLogin))
 	mux.HandleFunc("/api/passkey/logout", CORS(Logout))
-
 	mux.HandleFunc("/api/passkey/private", CORS(LoggedInMiddleware(Private)))
 
-	// Start the server
-	log.Printf("[INFO] start server at %s", origin)
-	if err := http.ListenAndServe(port, mux); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux); err != nil {
 		log.Println(err)
 	}
+}
+
+func initPasskeyStore() {
+	rpName := os.Getenv("RP_NAME")
+	host := os.Getenv("HOST")
+	origins := os.Getenv("ORIGINS")
+	wconfig := &webauthn.Config{
+		RPDisplayName: rpName,                      // Display Name for your site
+		RPID:          host,                        // Generally the FQDN for your site
+		RPOrigins:     strings.Split(origins, ","), // The origin URLs allowed for WebAuthn
+	}
+	webAuthn, err = webauthn.New(wconfig)
+	if err != nil {
+		fmt.Printf("[FATA] %s", err.Error())
+		os.Exit(1)
+	}
+	passkeyStore = NewPasskeyStore()
+}
+
+func initDB() {
+	var err error
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", dbUser, dbPassword, dbHost, dbPort, dbName)
+	db, err = sql.Open("mysql", dsn)
+	if err != nil {
+		fmt.Printf("[FATA] %s", err.Error())
+		os.Exit(1)
+	}
+
+	if err = db.Ping(); err != nil {
+		fmt.Printf("[FATA] %s", err.Error())
+		os.Exit(1)
+	}
+
+	fmt.Println("[INFO] connected to database")
 }

@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/elgs/gosqlcrud"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/google/uuid"
 )
 
 /////////////////////////////
@@ -18,15 +20,23 @@ import (
 
 func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] begin registration ----------------------\\")
-	username, err := getUsername(r)
+	u, err := getUserData(r)
 	if err != nil {
 		log.Printf("[ERRO] can't get user name: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user := passkeyStore.GetOrCreateUser(username)
+	user, err := passkeyStore.CreateUser(u.Email, u.Name, u.DisplayName)
+	if err != nil {
+		msg := fmt.Sprintf("can't create user: %s", err.Error())
+		log.Printf("[ERRO] %s", msg)
+		JSONResponse(w, msg, http.StatusBadRequest)
+		return
+	}
 
+	// Begin the registration process, which will return options to be sent to the client
+	// along with session data to be stored on the server until verification is finished
 	options, session, err := webAuthn.BeginRegistration(user)
 	if err != nil {
 		msg := fmt.Sprintf("can't begin registration: %s", err.Error())
@@ -35,8 +45,13 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sessionID := GenSessionID()
-	passkeyStore.SaveSession(sessionID, session)
+	sessionID := uuid.New().String()
+	err = passkeyStore.SaveSession(sessionID, session, user.DB_ID)
+	if err != nil {
+		log.Printf("[ERRO] can't save session: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Header().Add("Access-Control-Expose-Headers", "register_sid")
 	w.Header().Set("register_sid", sessionID)
 	JSONResponse(w, options, http.StatusOK) // return the options generated with the session key
@@ -51,18 +66,26 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 
 func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	// read register_sid from header
-	sid := r.Header.Get("register_sid")
-	if sid == "" {
+	registerSid := r.Header.Get("register_sid")
+	if registerSid == "" {
 		log.Printf("[ERRO] can't get session id: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Get the session data stored from the function above
-	session := passkeyStore.GetSession(sid)
+	session, err := passkeyStore.GetSession(registerSid)
+	if err != nil {
+		log.Printf("[ERRO] can't get session: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-	// In out example username == userID, but in real world it should be different
-	user := passkeyStore.GetOrCreateUser(string(session.UserID))
+	user, err := passkeyStore.GetUser(session.UserID)
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	credential, err := webAuthn.FinishRegistration(user, *session, r)
 	if err != nil {
@@ -74,9 +97,13 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 
 	user.AddCredential(credential)
 	passkeyStore.SaveUser(user)
-	passkeyStore.DeleteSession(sid)
+	passkeyStore.DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
 	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
+
+	gosqlcrud.Create(db, user, "user")
+
+	SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
 }
 
 //////////////////////
@@ -88,14 +115,19 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] begin login ----------------------\\")
 
-	username, err := getUsername(r)
+	u, err := getUserData(r)
 	if err != nil {
 		log.Printf("[ERRO]can't get user name: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user := passkeyStore.GetOrCreateUser(username) // Find the user
+	user, err := passkeyStore.GetUserByEmail(u.Email) // Find the user
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	options, session, err := webAuthn.BeginLogin(user)
 	if err != nil {
@@ -106,8 +138,8 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make a session key and store the sessionData values
-	sessionID := GenSessionID()
-	passkeyStore.SaveSession(sessionID, session)
+	sessionID := uuid.New().String()
+	passkeyStore.SaveSession(sessionID, session, user.DB_ID)
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -129,10 +161,20 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Get the session data stored from the function above
-	session := passkeyStore.GetSession(sid)
+	session, err := passkeyStore.GetSession(sid)
+	if err != nil {
+		log.Printf("[ERRO] can't get session: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	// In out example username == userID, but in real world it should be different
-	user := passkeyStore.GetOrCreateUser(string(session.UserID)) // Get the user
+	user, err := passkeyStore.GetUser(session.UserID)
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	credential, err := webAuthn.FinishLogin(user, *session, r)
 	if err != nil {
@@ -152,11 +194,11 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Delete the login session data
 	passkeyStore.DeleteSession(sid)
-	sessionID := GenSessionID()
+	sessionID := uuid.New().String()
 
 	passkeyStore.SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	})
+	}, user.DB_ID)
 
 	w.Header().Set("sid", sessionID)
 
@@ -210,8 +252,8 @@ func LoggedInMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		session := passkeyStore.GetSession(sid)
-		if session == nil {
+		session, err := passkeyStore.GetSession(sid)
+		if err != nil {
 			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] can't get session")
 			return
@@ -234,17 +276,13 @@ func JSONResponse(w http.ResponseWriter, data any, status int) {
 	_ = json.NewEncoder(w).Encode(data)
 }
 
-// getUsername is a helper function to extract the username from json request
-func getUsername(r *http.Request) (string, error) {
-	type Username struct {
-		Username string `json:"username"`
-	}
-	var u Username
+// getUserData is a helper function to extract the user data from json request
+func getUserData(r *http.Request) (*PasskeyUser, error) {
+	var u PasskeyUser
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
-		return "", err
+		return nil, err
 	}
-
-	return u.Username, nil
+	return &u, nil
 }
 
 func CORS(next http.HandlerFunc) http.HandlerFunc {
