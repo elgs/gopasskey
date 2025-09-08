@@ -73,11 +73,12 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
 		log.Printf("Error marshaling credential: %s", err.Error())
 		return
 	}
+	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
 		Credential: credJSON,
-		Created:    time.Now(),
+		Created:    &now,
 	}
 	result, err := gosqlcrud.Create(db, cred, "user_credential")
 	if err != nil {
@@ -95,11 +96,12 @@ func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 		log.Printf("Error marshaling credential: %s", err.Error())
 		return
 	}
+	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
 		Credential: credJSON,
-		Updated:    time.Now(),
+		Updated:    &now,
 	}
 	result, err := gosqlcrud.Update(db, cred, "user_credential")
 	if err != nil {
@@ -139,8 +141,8 @@ type PasskeyUserCredential struct {
 	ID         string          `json:"id" db:"id" pk:"true"`
 	UserID     string          `json:"user_id" db:"user_id"`
 	Credential json.RawMessage `json:"credential" db:"credential"`
-	Created    time.Time       `json:"created" db:"created"`
-	Updated    time.Time       `json:"updated" db:"updated"`
+	Created    *time.Time      `json:"created" db:"created"`
+	Updated    *time.Time      `json:"updated" db:"updated"`
 }
 
 ////////////////////////
