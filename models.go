@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
+	"log"
 	"time"
 
 	"github.com/elgs/gosqlcrud"
@@ -29,8 +29,6 @@ type PasskeyUser struct { // implements webauthn.User
 	IsVerified  bool      `json:"is_verified" db:"is_verified"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
 	IsDeleted   bool      `json:"is_deleted" db:"is_deleted"`
-	creds       []webauthn.Credential
-	credsMutex  sync.RWMutex
 }
 
 func (this *PasskeyUser) WebAuthnID() []byte {
@@ -50,35 +48,80 @@ func (this *PasskeyUser) WebAuthnDisplayName() string {
 }
 
 func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
-	this.credsMutex.RLock()
-	defer this.credsMutex.RUnlock()
-	return this.creds
+	creds := []PasskeyUserCredential{}
+	err := gosqlcrud.QueryToStructs(db, &creds, "SELECT * FROM user_credential WHERE user_id = ?", this.DB_ID)
+	if err != nil {
+		log.Printf("Error retrieving credentials: %s", err.Error())
+		return nil
+	}
+
+	var webAuthnCreds []webauthn.Credential
+	for _, c := range creds {
+		var credential webauthn.Credential
+		err := json.Unmarshal(c.Credential, &credential)
+		if err != nil {
+			log.Printf("Error unmarshaling credential: %s", err.Error())
+			return nil
+		}
+		webAuthnCreds = append(webAuthnCreds, credential)
+	}
+	return webAuthnCreds
 }
 
 func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
-	this.credsMutex.Lock()
-	defer this.credsMutex.Unlock()
-	this.creds = append(this.creds, *credential)
+	credJSON, err := json.Marshal(credential)
+	if err != nil {
+		log.Printf("Error marshaling credential: %s", err.Error())
+		return
+	}
+	cred := &PasskeyUserCredential{
+		ID:         fmt.Sprintf("%x", credential.ID),
+		UserID:     this.DB_ID,
+		Credential: credJSON,
+		Created:    time.Now(),
+	}
+	result, err := gosqlcrud.Create(db, cred, "user_credential")
+	if err != nil {
+		log.Printf("Error adding credential: %s", err.Error())
+		return
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("Error adding credential: no rows affected")
+	}
 }
 
 func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
-	this.credsMutex.Lock()
-	defer this.credsMutex.Unlock()
-	for i, c := range this.creds {
-		if string(c.ID) == string(credential.ID) {
-			this.creds[i] = *credential
-		}
+	credJSON, err := json.Marshal(credential)
+	if err != nil {
+		log.Printf("Error marshaling credential: %s", err.Error())
+		return
+	}
+	cred := &PasskeyUserCredential{
+		ID:         fmt.Sprintf("%x", credential.ID),
+		UserID:     this.DB_ID,
+		Credential: credJSON,
+		Updated:    time.Now(),
+	}
+	result, err := gosqlcrud.Update(db, cred, "user_credential")
+	if err != nil {
+		log.Printf("Error updating credential: %s", err.Error())
+		return
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("Error updating credential: no rows affected")
 	}
 }
 
 func (this *PasskeyUser) RemoveCredential(credentialID []byte) {
-	this.credsMutex.Lock()
-	defer this.credsMutex.Unlock()
-	for i, c := range this.creds {
-		if string(c.ID) == string(credentialID) {
-			this.creds = append(this.creds[:i], this.creds[i+1:]...)
-			return
-		}
+	result, err := gosqlcrud.Delete(db, &PasskeyUserCredential{
+		ID: string(credentialID),
+	}, "user_credential")
+	if err != nil {
+		log.Printf("Error removing credential: %s", err.Error())
+		return
+	}
+	if result.RowsAffected == 0 {
+		log.Printf("Error removing credential: no rows affected")
 	}
 }
 
@@ -106,6 +149,7 @@ type PasskeyUserCredential struct {
 	UserID     string          `json:"user_id" db:"user_id"`
 	Credential json.RawMessage `json:"credential" db:"credential"`
 	Created    time.Time       `json:"created" db:"created"`
+	Updated    time.Time       `json:"updated" db:"updated"`
 }
 
 ////////////////////////
@@ -202,6 +246,7 @@ func (this *PasskeyStore) CreateUser(email, name, displayName string) (*PasskeyU
 }
 
 func (this *PasskeyStore) GetUser(id []byte) (*PasskeyUser, error) {
+	log.Printf("Getting user with ID: %s", string(id))
 	user := &PasskeyUser{
 		DB_ID: string(id),
 	}
@@ -214,14 +259,18 @@ func (this *PasskeyStore) GetUser(id []byte) (*PasskeyUser, error) {
 }
 
 func (this *PasskeyStore) GetUserByEmail(email string) (*PasskeyUser, error) {
-	user := &PasskeyUser{
-		Email: email,
-	}
-	err := gosqlcrud.Retrieve(db, user, "user")
+	users := []PasskeyUser{}
+	err := gosqlcrud.QueryToStructs(db, &users, "SELECT * FROM user WHERE email = ?", email)
 	if err != nil {
+		log.Printf("Error looking up user by email: %s", err.Error())
 		return nil, err
 	}
-	return user, nil
+	if len(users) > 0 {
+		user := &users[0]
+		user.ID = []byte(user.DB_ID)
+		return user, nil
+	}
+	return nil, fmt.Errorf("user not found")
 }
 
 func (this *PasskeyStore) SaveUser(user *PasskeyUser) error {

@@ -103,7 +103,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 
 	gosqlcrud.Create(db, user, "user")
 
-	SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
+	// SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
 }
 
 //////////////////////
@@ -154,14 +154,14 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 ///////////////////////
 
 func FinishLogin(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("login_sid")
-	if sid == "" {
+	loginSid := r.Header.Get("login_sid")
+	if loginSid == "" {
 		log.Printf("[ERRO] can't get session id: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	// Get the session data stored from the function above
-	session, err := passkeyStore.GetSession(sid)
+	session, err := passkeyStore.GetSession(loginSid)
 	if err != nil {
 		log.Printf("[ERRO] can't get session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -193,7 +193,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	passkeyStore.SaveUser(user)
 
 	// Delete the login session data
-	passkeyStore.DeleteSession(sid)
+	passkeyStore.DeleteSession(loginSid)
 	sessionID := uuid.New().String()
 
 	passkeyStore.SaveSession(sessionID, &webauthn.SessionData{
