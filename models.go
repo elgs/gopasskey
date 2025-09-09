@@ -67,7 +67,7 @@ func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
 	return webAuthnCreds
 }
 
-func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
+func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label string) {
 	credJSON, err := json.Marshal(credential)
 	if err != nil {
 		log.Printf("Error marshaling credential: %s", err.Error())
@@ -77,6 +77,7 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
+		Label:      label,
 		Credential: credJSON,
 		Created:    &now,
 	}
@@ -90,7 +91,7 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential) {
 	}
 }
 
-func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
+func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential, label string) {
 	credJSON, err := json.Marshal(credential)
 	if err != nil {
 		log.Printf("Error marshaling credential: %s", err.Error())
@@ -100,6 +101,7 @@ func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
+		Label:      label,
 		Credential: credJSON,
 		Updated:    &now,
 	}
@@ -140,6 +142,7 @@ type Req struct {
 type PasskeyUserCredential struct {
 	ID         string          `json:"id" db:"id" pk:"true"`
 	UserID     string          `json:"user_id" db:"user_id"`
+	Label      string          `json:"label" db:"label"`
 	Credential json.RawMessage `json:"credential" db:"credential"`
 	Created    *time.Time      `json:"created" db:"created"`
 	Updated    *time.Time      `json:"updated" db:"updated"`

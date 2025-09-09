@@ -309,7 +309,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.AddCredential(credential)
+	user.AddCredential(credential, r.UserAgent())
 	// SaveUser(user)
 	DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
@@ -403,7 +403,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If login was successful, update the credential object
-	user.UpdateCredential(credential)
+	user.UpdateCredential(credential, r.UserAgent())
 	// SaveUser(user)
 
 	// Delete the login session data
