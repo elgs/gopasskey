@@ -1,11 +1,11 @@
 module github.com/elgs/go-passkey
 
-go 1.25.1
+go 1.25
 
 // replace github.com/elgs/gosqlcrud => ../gosqlcrud
 
 require (
-	github.com/elgs/gosqlcrud v0.0.0-20250908204924-85316794a26a
+	github.com/elgs/gosqlcrud v0.0.0-20250910082821-a05a254084b4
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/go-webauthn/webauthn v0.13.4
 	github.com/google/uuid v1.6.0

@@ -56,29 +56,18 @@ func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
 
 	var webAuthnCreds []webauthn.Credential
 	for _, c := range creds {
-		var credential webauthn.Credential
-		err := json.Unmarshal(c.Credential, &credential)
-		if err != nil {
-			log.Printf("Error unmarshaling credential: %s", err.Error())
-			return nil
-		}
-		webAuthnCreds = append(webAuthnCreds, credential)
+		webAuthnCreds = append(webAuthnCreds, c.Credential)
 	}
 	return webAuthnCreds
 }
 
 func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label string) {
-	credJSON, err := json.Marshal(credential)
-	if err != nil {
-		log.Printf("Error marshaling credential: %s", err.Error())
-		return
-	}
 	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
 		Label:      label,
-		Credential: credJSON,
+		Credential: *credential,
 		Created:    &now,
 	}
 	result, err := gosqlcrud.Create(db, cred, "user_credential")
@@ -92,17 +81,12 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label st
 }
 
 func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential, label string) {
-	credJSON, err := json.Marshal(credential)
-	if err != nil {
-		log.Printf("Error marshaling credential: %s", err.Error())
-		return
-	}
 	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		UserID:     this.DB_ID,
 		Label:      label,
-		Credential: credJSON,
+		Credential: *credential,
 		Updated:    &now,
 	}
 	result, err := gosqlcrud.Update(db, cred, "user_credential")
@@ -140,12 +124,12 @@ type Req struct {
 /////////////////////////////////
 
 type PasskeyUserCredential struct {
-	ID         string          `json:"id" db:"id" pk:"true"`
-	UserID     string          `json:"user_id" db:"user_id"`
-	Label      string          `json:"label" db:"label"`
-	Credential json.RawMessage `json:"credential" db:"credential"`
-	Created    *time.Time      `json:"created" db:"created"`
-	Updated    *time.Time      `json:"updated" db:"updated"`
+	ID         string              `json:"id" db:"id" pk:"true"`
+	UserID     string              `json:"user_id" db:"user_id"`
+	Label      string              `json:"label" db:"label"`
+	Credential webauthn.Credential `json:"credential" db:"credential"`
+	Created    *time.Time          `json:"created" db:"created"`
+	Updated    *time.Time          `json:"updated" db:"updated"`
 }
 
 ////////////////////////

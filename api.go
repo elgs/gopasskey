@@ -423,7 +423,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 
 //////////////////
 //              //
-//    logout    //
+//    Logout    //
 //              //
 //////////////////
 
