@@ -1,7 +1,6 @@
 import LWElement from './../../lib/lw-element.js';
 import ast from './ast.js';
-
-const api_url = 'http://localhost:8080/api/passkey/';
+import env from '../../env.js';
 
 customElements.define('web-root',
   class extends LWElement {  // LWElement extends HTMLElement
@@ -26,7 +25,7 @@ customElements.define('web-root',
     async startSignup() {
       try {
         // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}signup_start`, {
+        const response = await fetch(`${env.apiUrl}signup_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
@@ -48,7 +47,7 @@ customElements.define('web-root',
     async finishSignup() {
       try {
         // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}signup_finish`, {
+        const response = await fetch(`${env.apiUrl}signup_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, code: this.vCode })
@@ -70,7 +69,7 @@ customElements.define('web-root',
     async startLoginWithCode() {
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}login_with_code_start`, {
+        const response = await fetch(`${env.apiUrl}login_with_code_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -92,7 +91,7 @@ customElements.define('web-root',
     async finishLoginWithCode() {
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}login_with_code_finish`, {
+        const response = await fetch(`${env.apiUrl}login_with_code_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, code: this.vCode })
@@ -120,7 +119,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get registration options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}register_start`, {
+        const response = await fetch(`${env.apiUrl}register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
@@ -145,7 +144,7 @@ customElements.define('web-root',
         // A new attestation is created. This also means a new public-private-key pair is created.
         const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options.publicKey });
         // Send attestationResponse back to server for verification and storage.
-        const verificationResponse = await fetch(`${api_url}register_finish`, {
+        const verificationResponse = await fetch(`${env.apiUrl}register_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'register_sid': registerSid },
           body: JSON.stringify(attestationResponse)
@@ -166,7 +165,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${api_url}login_start`, {
+        const response = await fetch(`${env.apiUrl}login_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -191,7 +190,7 @@ customElements.define('web-root',
         const assertionResponse = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options.publicKey });
 
         // Send assertionResponse back to server for verification.
-        const verificationResponse = await fetch(`${api_url}login_finish`, {
+        const verificationResponse = await fetch(`${env.apiUrl}login_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'login_sid': loginSid },
           body: JSON.stringify(assertionResponse)
@@ -216,7 +215,7 @@ customElements.define('web-root',
     async logout() {
       try {
         const sid = localStorage.getItem('sid');
-        const response = await fetch(`${api_url}logout`, {
+        const response = await fetch(`${env.apiUrl}logout`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'sid': sid }
         });
@@ -241,7 +240,7 @@ customElements.define('web-root',
           return;
         }
 
-        const response = await fetch(`${api_url}private`, {
+        const response = await fetch(`${env.apiUrl}private`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json', 'sid': sid }
         });
@@ -259,7 +258,7 @@ customElements.define('web-root',
 
     async getUserCredentials() {
       try {
-        const response = await fetch(`${api_url}credentials`, {
+        const response = await fetch(`${env.apiUrl}credentials`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })

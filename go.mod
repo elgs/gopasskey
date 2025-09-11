@@ -2,7 +2,7 @@ module github.com/elgs/go-passkey
 
 go 1.25
 
-replace github.com/elgs/gosqlcrud => ../gosqlcrud
+// replace github.com/elgs/gosqlcrud => ../gosqlcrud
 
 require (
 	github.com/elgs/gosqlcrud v0.0.0-20250910094801-55167c4527dc
