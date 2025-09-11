@@ -36,10 +36,3 @@ func SendMail(to, subject, body string) error {
 	}
 	return nil
 }
-
-func getenv(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}

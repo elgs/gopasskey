@@ -9,14 +9,18 @@ customElements.define('web-root',
       super(ast);
     }
 
-    email = 'i@az.ht';
-    name = 'Qian Chen';
-    displayName = 'Qian';
+    email = '';
+    name = '';
+    displayName = '';
     message = '';
     vCode = '';
 
-    domReady() {
+    async domReady() {
       // console.log('Dom is ready');
+      const sid = localStorage.getItem('sid');
+      if (sid) {
+        await this.private();
+      }
     }
 
     async startSignup() {
@@ -232,10 +236,10 @@ customElements.define('web-root',
     async private() {
       try {
         const sid = localStorage.getItem('sid');
-        // if (!sid) {
-        //   this.message = 'Not logged in';
-        //   return;
-        // }
+        if (!sid) {
+          this.message = 'Not logged in';
+          return;
+        }
 
         const response = await fetch(`${api_url}private`, {
           method: 'GET',

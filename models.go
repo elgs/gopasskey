@@ -46,14 +46,18 @@ func (this *PasskeyUser) WebAuthnDisplayName() string {
 	return this.DisplayName
 }
 
-func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
-	creds := []PasskeyUserCredential{}
+func (this *PasskeyUser) Credentials() []*PasskeyUserCredential {
+	creds := []*PasskeyUserCredential{}
 	err := gosqlcrud.QueryToStructs(db, &creds, "SELECT * FROM user_credential WHERE user_id = ?", this.DB_ID)
 	if err != nil {
 		log.Printf("Error retrieving credentials: %s", err.Error())
 		return nil
 	}
+	return creds
+}
 
+func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
+	creds := this.Credentials()
 	var webAuthnCreds []webauthn.Credential
 	for _, c := range creds {
 		webAuthnCreds = append(webAuthnCreds, c.Credential)

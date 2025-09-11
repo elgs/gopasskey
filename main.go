@@ -51,8 +51,10 @@ func initApiServer() {
 	mux.HandleFunc("/api/passkey/login_start", CORS(BeginLogin))
 	mux.HandleFunc("/api/passkey/login_finish", CORS(FinishLogin))
 	mux.HandleFunc("/api/passkey/logout", CORS(Logout))
-	mux.HandleFunc("/api/passkey/private", CORS(LoggedInMiddleware(Private)))
 	mux.HandleFunc("/api/passkey/credentials", CORS(GetUserCredentials))
+
+	mux.HandleFunc("/api/passkey/private", CORS(LoggedInMiddleware(Private)))
+	mux.HandleFunc("/api/passkey/me", CORS(LoggedInMiddleware(Me)))
 
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux); err != nil {
 		log.Println(err)

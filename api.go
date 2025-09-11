@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -26,21 +25,12 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 		JSONResponse(w, "User not found", http.StatusNotFound)
 		return
 	}
-	creds := user.WebAuthnCredentials()
+	creds := user.Credentials()
 	var credentialIds []string
 	for _, cred := range creds {
-		credentialIds = append(credentialIds, base64URLEncode(cred.ID))
+		credentialIds = append(credentialIds, cred.Label)
 	}
-	JSONResponse(w, map[string]interface{}{"credentialIds": credentialIds}, http.StatusOK)
-}
-
-// Helper to encode []byte to base64url (no padding)
-func base64URLEncode(b []byte) string {
-	s := ""
-	if len(b) > 0 {
-		s = base64.RawURLEncoding.EncodeToString(b)
-	}
-	return s
+	JSONResponse(w, map[string]any{"credentialIds": credentialIds}, http.StatusOK)
 }
 
 ///////////////////////
@@ -514,4 +504,41 @@ func CORS(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r)
 	}
+}
+
+//////////////
+//          //
+//    Me    //
+//          //
+//////////////
+
+func Me(w http.ResponseWriter, r *http.Request) {
+	sid := r.Header.Get("sid")
+	if sid == "" {
+		log.Printf("[ERRO] can't get session id")
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	session, err := GetSession(sid)
+	if err != nil {
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
+		log.Println("[ERRO] can't get session")
+		return
+	}
+
+	if session.Expires.Before(time.Now()) {
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
+		log.Println("[ERRO] session expired")
+		return
+	}
+
+	user, err := GetUser(session.UserID)
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	JSONResponse(w, user, http.StatusOK)
 }
