@@ -446,7 +446,7 @@ func Private(w http.ResponseWriter, r *http.Request) {
 //                   //
 ///////////////////////
 
-func LoggedInMiddleware(next http.HandlerFunc) http.HandlerFunc {
+func SessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// TODO: url to redirect to should be passed as a parameter
 
