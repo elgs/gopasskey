@@ -89,7 +89,6 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label st
 
 func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 	now := time.Now()
-	fmt.Println(credential.Authenticator.SignCount, "aaa")
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
 		Credential: credential,
