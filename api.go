@@ -29,7 +29,7 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 	creds := user.Credentials()
 	var credentialIds []string
 	for _, cred := range creds {
-		credentialIds = append(credentialIds, cred.Label)
+		credentialIds = append(credentialIds, *cred.Label)
 	}
 	JSONResponse(w, map[string]any{"credentialIds": credentialIds}, http.StatusOK)
 }
@@ -206,7 +206,7 @@ func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	}, user.ID, time.Hour) // save session for 1 hour
+	}, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
 
 	// Delete the login code
@@ -251,7 +251,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID := uuid.New().String()
-	err = SaveSession(sessionID, session, user.ID, time.Minute*5) // save session for 5 minutes
+	err = SaveSession(sessionID, session, time.Minute*5) // save session for 5 minutes
 	if err != nil {
 		log.Printf("[ERRO] can't save session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -344,7 +344,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := uuid.New().String()
-	SaveSession(sessionID, session, user.ID, time.Minute*5) // save session for 5 minutes
+	SaveSession(sessionID, session, time.Minute*5) // save session for 5 minutes
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -391,10 +391,12 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	// Handle credential.Authenticator.CloneWarning
 	if credential.Authenticator.CloneWarning {
 		log.Printf("[WARN] can't finish login: %s", "CloneWarning")
+		JSONResponse(w, "CloneWarning", http.StatusBadRequest)
+		return
 	}
 
 	// If login was successful, update the credential object
-	user.UpdateCredential(credential, r.UserAgent())
+	user.UpdateCredential(credential)
 	// SaveUser(user)
 
 	// Delete the login session data
@@ -404,7 +406,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	}, user.ID, time.Hour) // save session for 1 hour
+	}, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
 	/////////////////////////////////////////////////////////////////
 

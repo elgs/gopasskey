@@ -60,18 +60,21 @@ func (this *PasskeyUser) WebAuthnCredentials() []webauthn.Credential {
 	creds := this.Credentials()
 	var webAuthnCreds []webauthn.Credential
 	for _, c := range creds {
-		webAuthnCreds = append(webAuthnCreds, c.Credential)
+		webAuthnCreds = append(webAuthnCreds, *c.Credential)
 	}
 	return webAuthnCreds
 }
 
 func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label string) {
 	now := time.Now()
+	aaguid := credential.Authenticator.AAGUID
+	aaguidStr := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", aaguid[0:4], aaguid[4:6], aaguid[6:8], aaguid[8:10], aaguid[10:16])
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
-		UserID:     this.ID,
-		Label:      label,
-		Credential: *credential,
+		UserID:     &this.ID,
+		AAGUID:     &aaguidStr,
+		Label:      &label,
+		Credential: credential,
 		Created:    &now,
 	}
 	result, err := gosqlcrud.Create(db, cred, "user_credential")
@@ -84,13 +87,12 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label st
 	}
 }
 
-func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential, label string) {
+func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential) {
 	now := time.Now()
+	fmt.Println(credential.Authenticator.SignCount, "aaa")
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
-		UserID:     this.ID,
-		Label:      label,
-		Credential: *credential,
+		Credential: credential,
 		Updated:    &now,
 	}
 	result, err := gosqlcrud.Update(db, cred, "user_credential")
@@ -128,12 +130,13 @@ type Req struct {
 /////////////////////////////////
 
 type PasskeyUserCredential struct {
-	ID         string              `json:"id" db:"id" pk:"true"`
-	UserID     string              `json:"user_id" db:"user_id"`
-	Label      string              `json:"label" db:"label"`
-	Credential webauthn.Credential `json:"credential" db:"credential"`
-	Created    *time.Time          `json:"created" db:"created"`
-	Updated    *time.Time          `json:"updated" db:"updated"`
+	ID         string               `json:"id" db:"id" pk:"true"`
+	UserID     *string              `json:"user_id" db:"user_id"`
+	AAGUID     *string              `json:"aaguid" db:"aaguid"`
+	Label      *string              `json:"label" db:"label"`
+	Credential *webauthn.Credential `json:"credential" db:"credential"`
+	Created    *time.Time           `json:"created" db:"created"`
+	Updated    *time.Time           `json:"updated" db:"updated"`
 }
 
 ////////////////////////
@@ -159,7 +162,7 @@ func GetSession(sessionID string) (*webauthn.SessionData, error) {
 	return nil, fmt.Errorf("session not found")
 }
 
-func SaveSession(sessionID string, data *webauthn.SessionData, userDBID string, ttl time.Duration) error {
+func SaveSession(sessionID string, data *webauthn.SessionData, ttl time.Duration) error {
 	dataJSON, err := json.Marshal(data)
 	if err != nil {
 		return err
