@@ -6,6 +6,7 @@ go 1.25
 
 require (
 	github.com/elgs/gosqlcrud v0.0.0-20250910094801-55167c4527dc
+	github.com/elgs/gostrgen v0.0.0-20251010065124-dce324c66371
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/go-webauthn/webauthn v0.14.0
 	github.com/google/uuid v1.6.0

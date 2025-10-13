@@ -14,6 +14,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elgs/gosqlcrud v0.0.0-20250910094801-55167c4527dc h1:UtauPRQ5tbipqNdyvot5eb8z5XLEtP9TQ2VHpiVNO9U=
 github.com/elgs/gosqlcrud v0.0.0-20250910094801-55167c4527dc/go.mod h1:CFbL7OS4w/brXWdIP2C1rYFpS9nEGA11Oc3qb2nTvTY=
+github.com/elgs/gostrgen v0.0.0-20251010065124-dce324c66371 h1:4WADfZZW26C7UgER4MEwZpS/THGj0VEf6HiXS3PyRfo=
+github.com/elgs/gostrgen v0.0.0-20251010065124-dce324c66371/go.mod h1:qxVxKgX2MC/LcAmvASQ96hjjlcBOV6wQ+ZV9r1+nB3k=
 github.com/fxamacker/cbor/v2 v2.9.0 h1:NpKPmjDBgUfBms6tr6JZkTHtfFGcMKsw3eGcmD/sapM=
 github.com/fxamacker/cbor/v2 v2.9.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/go-sql-driver/mysql v1.9.3 h1:U/N249h2WzJ3Ukj8SowVFjdtZKfu9vlLZxjPXV1aweo=

@@ -18,8 +18,8 @@ import (
 ///////////////////////
 
 type PasskeyUser struct { // implements webauthn.User
-	ID          []byte
-	DB_ID       string    `json:"id" db:"id" pk:"true"`
+	// ID          []byte
+	ID          string    `json:"id" db:"id" pk:"true"`
 	DisplayName string    `json:"display_name" db:"display_name"`
 	Name        string    `json:"name" db:"name"`
 	Email       string    `json:"email" db:"email"`
@@ -31,7 +31,7 @@ type PasskeyUser struct { // implements webauthn.User
 }
 
 func (this *PasskeyUser) WebAuthnID() []byte {
-	return this.ID
+	return []byte(this.ID)
 }
 
 func (this *PasskeyUser) WebAuthnName() string {
@@ -48,7 +48,7 @@ func (this *PasskeyUser) WebAuthnDisplayName() string {
 
 func (this *PasskeyUser) Credentials() []*PasskeyUserCredential {
 	creds := []*PasskeyUserCredential{}
-	err := gosqlcrud.QueryToStructs(db, &creds, "SELECT * FROM user_credential WHERE user_id = ?", this.DB_ID)
+	err := gosqlcrud.QueryToStructs(db, &creds, "SELECT * FROM user_credential WHERE user_id = ?", this.ID)
 	if err != nil {
 		log.Printf("Error retrieving credentials: %s", err.Error())
 		return nil
@@ -69,7 +69,7 @@ func (this *PasskeyUser) AddCredential(credential *webauthn.Credential, label st
 	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
-		UserID:     this.DB_ID,
+		UserID:     this.ID,
 		Label:      label,
 		Credential: *credential,
 		Created:    &now,
@@ -88,7 +88,7 @@ func (this *PasskeyUser) UpdateCredential(credential *webauthn.Credential, label
 	now := time.Now()
 	cred := &PasskeyUserCredential{
 		ID:         fmt.Sprintf("%x", credential.ID),
-		UserID:     this.DB_ID,
+		UserID:     this.ID,
 		Label:      label,
 		Credential: *credential,
 		Updated:    &now,
@@ -184,8 +184,7 @@ func DeleteSession(sessionID string) error {
 func CreateUser(email, name, displayName string) (*PasskeyUser, error) {
 	id := uuid.New().String()
 	user := &PasskeyUser{
-		ID:          []byte(id),
-		DB_ID:       id,
+		ID:          id,
 		DisplayName: displayName,
 		Name:        name,
 		Email:       email,
@@ -205,10 +204,10 @@ func CreateUser(email, name, displayName string) (*PasskeyUser, error) {
 	return user, nil
 }
 
-func GetUser(id []byte) (*PasskeyUser, error) {
-	log.Printf("Getting user with ID: %s", string(id))
+func GetUser(id string) (*PasskeyUser, error) {
+	log.Printf("Getting user with ID: %s", id)
 	user := &PasskeyUser{
-		DB_ID: string(id),
+		ID: id,
 	}
 	err := gosqlcrud.Retrieve(db, user, "user")
 	if err != nil {
@@ -227,7 +226,6 @@ func GetUserByEmail(email string) (*PasskeyUser, error) {
 	}
 	if len(users) > 0 {
 		user := &users[0]
-		user.ID = []byte(user.DB_ID)
 		return user, nil
 	}
 	return nil, fmt.Errorf("user not found")

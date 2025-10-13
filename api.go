@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elgs/gosqlcrud"
+	"github.com/elgs/gostrgen"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 )
@@ -58,7 +59,7 @@ func BeginSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
-	verificationCode := uuid.New().String()
+	verificationCode := gostrgen.RandGen(6, gostrgen.Upper|gostrgen.Digit, "", "")
 	redisClient.Set(ctx, fmt.Sprintf("passkey_signup_code:%s", verificationCode), fmt.Sprintf("%s|%s|%s", u.Email, u.Name, u.DisplayName), time.Minute*10)
 
 	// Log the verification code to the console (for testing purposes only)
@@ -152,8 +153,8 @@ func BeginLoginWithCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
-	verificationCode := uuid.New().String()
-	redisClient.Set(ctx, fmt.Sprintf("passkey_login_code:%s", verificationCode), user.DB_ID, time.Minute*10)
+	verificationCode := gostrgen.RandGen(6, gostrgen.Upper|gostrgen.Digit, "", "")
+	redisClient.Set(ctx, fmt.Sprintf("passkey_login_code:%s", verificationCode), user.ID, time.Minute*10)
 
 	// Log the verification code to the console (for testing purposes only)
 	log.Printf("[INFO] login verification code: %s", verificationCode)
@@ -183,13 +184,13 @@ func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if the verification code is valid
-	userDBID, err := redisClient.Get(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code)).Result()
+	userID, err := redisClient.Get(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code)).Result()
 	if err != nil {
 		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
 		return
 	}
 
-	user, err := GetUser([]byte(userDBID))
+	user, err := GetUser(userID)
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -205,7 +206,7 @@ func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	}, user.DB_ID, time.Hour) // save session for 1 hour
+	}, user.ID, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
 
 	// Delete the login code
@@ -250,7 +251,7 @@ func BeginRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sessionID := uuid.New().String()
-	err = SaveSession(sessionID, session, user.DB_ID, time.Minute*5) // save session for 5 minutes
+	err = SaveSession(sessionID, session, user.ID, time.Minute*5) // save session for 5 minutes
 	if err != nil {
 		log.Printf("[ERRO] can't save session: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -284,7 +285,7 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := GetUser(session.UserID)
+	user, err := GetUser(string(session.UserID))
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -343,7 +344,7 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := uuid.New().String()
-	SaveSession(sessionID, session, user.DB_ID, time.Minute*5) // save session for 5 minutes
+	SaveSession(sessionID, session, user.ID, time.Minute*5) // save session for 5 minutes
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -373,7 +374,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// In out example username == userID, but in real world it should be different
-	user, err := GetUser(session.UserID)
+	user, err := GetUser(string(session.UserID))
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
@@ -403,7 +404,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		Expires: time.Now().Add(time.Hour),
-	}, user.DB_ID, time.Hour) // save session for 1 hour
+	}, user.ID, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
 	/////////////////////////////////////////////////////////////////
 
@@ -533,7 +534,7 @@ func Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := GetUser(session.UserID)
+	user, err := GetUser(string(session.UserID))
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
