@@ -10,7 +10,8 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/go-webauthn/webauthn v0.14.0
 	github.com/google/uuid v1.6.0
-	github.com/redis/go-redis/v9 v9.14.0
+	github.com/justinas/alice v1.2.0
+	github.com/redis/go-redis/v9 v9.14.1
 )
 
 require (

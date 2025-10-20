@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +13,11 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-webauthn/webauthn/webauthn"
+	"github.com/justinas/alice"
 	"github.com/redis/go-redis/v9"
 )
 
+var env = os.Getenv("ENV")
 var host = getEnv("HOST", "localhost")
 var port = getEnv("PORT", "8080")
 var rpName = getEnv("RP_NAME", "Webauthn")
@@ -31,6 +35,10 @@ var webAuthn *webauthn.WebAuthn
 var db *sql.DB
 var redisClient *redis.Client
 
+//go:embed web/dist
+var web embed.FS
+var staticFS fs.FS
+
 func main() {
 	initRedis()
 	defer redisClient.Close()
@@ -41,20 +49,37 @@ func main() {
 }
 
 func initApiServer() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/passkey/signup_start", CORS(BeginSignup))
-	mux.HandleFunc("/api/passkey/signup_finish", CORS(FinishSignup))
-	mux.HandleFunc("/api/passkey/login_with_code_start", CORS(BeginLoginWithCode))
-	mux.HandleFunc("/api/passkey/login_with_code_finish", CORS(FinishLoginWithCode))
-	mux.HandleFunc("/api/passkey/register_start", CORS(BeginRegistration))
-	mux.HandleFunc("/api/passkey/register_finish", CORS(FinishRegistration))
-	mux.HandleFunc("/api/passkey/login_start", CORS(BeginLogin))
-	mux.HandleFunc("/api/passkey/login_finish", CORS(FinishLogin))
-	mux.HandleFunc("/api/passkey/logout", CORS(Logout))
-	mux.HandleFunc("/api/passkey/credentials", CORS(GetUserCredentials))
 
-	mux.HandleFunc("/api/passkey/private", CORS(SessionMiddleware(Private)))
-	mux.HandleFunc("/api/passkey/me", CORS(SessionMiddleware(Me)))
+	chain := alice.New(CORS, Auth)
+
+	mux := http.NewServeMux()
+
+	if env == "dev" {
+		staticFS = os.DirFS("web/build")
+		log.Println("Serving static files from disk (hot reload enabled)")
+	} else {
+		var err error
+		staticFS, err = fs.Sub(web, "web/dist")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+
+	mux.Handle("/api/pub/signup_start", chain.ThenFunc(BeginSignup))
+	mux.Handle("/api/pub/signup_finish", chain.ThenFunc(FinishSignup))
+	mux.Handle("/api/pub/login_with_code_start", chain.ThenFunc(BeginLoginWithCode))
+	mux.Handle("/api/pub/login_with_code_finish", chain.ThenFunc(FinishLoginWithCode))
+	mux.Handle("/api/pub/register_start", chain.ThenFunc(BeginRegistration))
+	mux.Handle("/api/pub/register_finish", chain.ThenFunc(FinishRegistration))
+	mux.Handle("/api/pub/login_start", chain.ThenFunc(BeginLogin))
+	mux.Handle("/api/pub/login_finish", chain.ThenFunc(FinishLogin))
+
+	mux.Handle("/api/logout", chain.ThenFunc(Logout))
+	mux.Handle("/api/credentials", chain.ThenFunc(GetUserCredentials))
+	mux.Handle("/api/private", chain.ThenFunc(Private))
+	mux.Handle("/api/me", chain.ThenFunc(Me))
 
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux); err != nil {
 		log.Println(err)

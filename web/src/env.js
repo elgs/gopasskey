@@ -1,3 +1,4 @@
 export default {
-  apiUrl: 'http://localhost:8080/api/passkey/',
+  apiUrl: '/api/',
+  pubApiUrl: '/api/pub/'
 };

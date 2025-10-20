@@ -8,7 +8,7 @@ customElements.define('web-root',
       super(ast);
     }
 
-    email = '';
+    email = 'qc@az.ht';
     name = '';
     displayName = '';
     message = '';
@@ -25,7 +25,7 @@ customElements.define('web-root',
     async startSignup() {
       try {
         // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}signup_start`, {
+        const response = await fetch(`${env.pubApiUrl}signup_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
@@ -47,7 +47,7 @@ customElements.define('web-root',
     async finishSignup() {
       try {
         // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}signup_finish`, {
+        const response = await fetch(`${env.pubApiUrl}signup_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, code: this.vCode })
@@ -69,7 +69,7 @@ customElements.define('web-root',
     async startLoginWithCode() {
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}login_with_code_start`, {
+        const response = await fetch(`${env.pubApiUrl}login_with_code_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -91,7 +91,7 @@ customElements.define('web-root',
     async finishLoginWithCode() {
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}login_with_code_finish`, {
+        const response = await fetch(`${env.pubApiUrl}login_with_code_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, code: this.vCode })
@@ -119,7 +119,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get registration options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}register_start`, {
+        const response = await fetch(`${env.pubApiUrl}register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
@@ -144,7 +144,7 @@ customElements.define('web-root',
         // A new attestation is created. This also means a new public-private-key pair is created.
         const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options.publicKey });
         // Send attestationResponse back to server for verification and storage.
-        const verificationResponse = await fetch(`${env.apiUrl}register_finish`, {
+        const verificationResponse = await fetch(`${env.pubApiUrl}register_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'register_sid': registerSid },
           body: JSON.stringify(attestationResponse)
@@ -165,7 +165,7 @@ customElements.define('web-root',
       // Retrieve the username from the input field
       try {
         // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.apiUrl}login_start`, {
+        const response = await fetch(`${env.pubApiUrl}login_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -190,7 +190,7 @@ customElements.define('web-root',
         const assertionResponse = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options.publicKey });
 
         // Send assertionResponse back to server for verification.
-        const verificationResponse = await fetch(`${env.apiUrl}login_finish`, {
+        const verificationResponse = await fetch(`${env.pubApiUrl}login_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'login_sid': loginSid },
           body: JSON.stringify(assertionResponse)

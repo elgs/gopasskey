@@ -449,9 +449,14 @@ func Private(w http.ResponseWriter, r *http.Request) {
 //                   //
 ///////////////////////
 
-func SessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func Auth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: url to redirect to should be passed as a parameter
+
+		if strings.HasPrefix(r.URL.Path, "/api/pub/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		sid := r.Header.Get("sid")
 		if sid == "" {
@@ -474,7 +479,7 @@ func SessionMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		next.ServeHTTP(w, r)
-	}
+	})
 }
 
 // JSONResponse is a helper function to send json response
@@ -493,20 +498,19 @@ func getUserData(r *http.Request) (*PasskeyUser, error) {
 	return &u, nil
 }
 
-func CORS(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func CORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		w.Header().Add("Access-Control-Allow-Headers", "*")
 		w.Header().Add("Access-Control-Expose-Headers", "sid")
-		// w.Header().Add("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Allow", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
 			return
 		}
 
-		next(w, r)
-	}
+		next.ServeHTTP(w, r)
+	})
 }
 
 //////////////
