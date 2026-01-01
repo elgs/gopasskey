@@ -8,7 +8,7 @@ customElements.define('web-root',
       super(ast);
     }
 
-    email = 'qc@az.ht';
+    email = '';
     name = '';
     displayName = '';
     message = '';
