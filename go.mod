@@ -1,4 +1,4 @@
-module github.com/elgs/go-passkey
+module github.com/elgs/gopasskey
 
 go 1.25.5
 
