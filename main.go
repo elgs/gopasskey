@@ -21,6 +21,7 @@ var env = os.Getenv("ENV")
 var host = getEnv("HOST", "localhost")
 var port = getEnv("PORT", "8080")
 var rpName = getEnv("RP_NAME", "Webauthn")
+var rpId = getEnv("RP_ID", host)
 var origins = getEnv("ORIGINS", "")
 var redisURL = getEnv("REDIS_URL", "localhost:6379")
 var dbUser = getEnv("DB_USER", "root")
@@ -89,7 +90,7 @@ func initApiServer() {
 func initPasskeyStore() {
 	wconfig := &webauthn.Config{
 		RPDisplayName: rpName,                      // Display Name for your site
-		RPID:          host,                        // Generally the FQDN for your site
+		RPID:          rpId,                        // Generally the FQDN for your site
 		RPOrigins:     strings.Split(origins, ","), // The origin URLs allowed for WebAuthn
 	}
 	webAuthn, err = webauthn.New(wconfig)
