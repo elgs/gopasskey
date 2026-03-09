@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elgs/gosqlcrud"
 	"github.com/elgs/gostrgen"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
@@ -16,12 +15,13 @@ import (
 
 // GetUserCredentials returns credential IDs for a user as base64url strings
 func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
-	req := &Req{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+	sid := r.Header.Get("sid")
+	session, err := GetSession(sid)
+	if err != nil {
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	user, err := GetUserByEmail(req.Email)
+	user, err := GetUser(string(session.UserID))
 	if err != nil {
 		JSONResponse(w, "User not found", http.StatusNotFound)
 		return
@@ -205,6 +205,7 @@ func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
 	// create a session for the user
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
+		UserID:  []byte(user.ID),
 		Expires: time.Now().Add(time.Hour),
 	}, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)
@@ -273,8 +274,8 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	// read register_sid from header
 	registerSid := r.Header.Get("register_sid")
 	if registerSid == "" {
-		log.Printf("[ERRO] can't get session id: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		log.Printf("[ERRO] missing register_sid header")
+		JSONResponse(w, "missing register_sid header", http.StatusBadRequest)
 		return
 	}
 
@@ -305,8 +306,6 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
 	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
-
-	gosqlcrud.Create(db, user, "user")
 
 	// SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
 }
@@ -344,7 +343,12 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Make a session key and store the sessionData values
 	sessionID := uuid.New().String()
-	SaveSession(sessionID, session, time.Minute*5) // save session for 5 minutes
+	err = SaveSession(sessionID, session, time.Minute*5) // save session for 5 minutes
+	if err != nil {
+		log.Printf("[ERRO] can't save session: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	w.Header().Add("Access-Control-Expose-Headers", "login_sid")
 	w.Header().Set("login_sid", sessionID)
 
@@ -361,8 +365,8 @@ func BeginLogin(w http.ResponseWriter, r *http.Request) {
 func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	loginSid := r.Header.Get("login_sid")
 	if loginSid == "" {
-		log.Printf("[ERRO] can't get session id: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		log.Printf("[ERRO] missing login_sid header")
+		JSONResponse(w, "missing login_sid header", http.StatusBadRequest)
 		return
 	}
 	// Get the session data stored from the function above
@@ -405,6 +409,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 	/////////////////////////////////////////////////////////////////
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
+		UserID:  user.WebAuthnID(),
 		Expires: time.Now().Add(time.Hour),
 	}, time.Hour) // save session for 1 hour
 	w.Header().Set("sid", sessionID)

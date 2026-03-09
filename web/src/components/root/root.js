@@ -258,10 +258,15 @@ customElements.define('web-root',
 
     async getUserCredentials() {
       try {
+
+        const sid = localStorage.getItem('sid');
+        if (!sid) {
+          this.message = 'Not logged in';
+          return;
+        }
+
         const response = await fetch(`${env.apiUrl}credentials`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.email })
+          headers: { 'Content-Type': 'application/json', 'sid': sid }
         });
 
         const msg = await response.json();

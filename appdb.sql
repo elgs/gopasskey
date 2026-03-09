@@ -26,6 +26,7 @@ DROP TABLE IF EXISTS `user_credential`;
 CREATE TABLE `user_credential` (
   `id` varchar(255) NOT NULL,
   `user_id` uuid NOT NULL,
+  `aaguid` varchar(255) DEFAULT NULL,
   `label` varchar(255) DEFAULT NULL,
   `credential` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`credential`)),
   `created` datetime DEFAULT NULL,
