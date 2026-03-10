@@ -1,23 +1,57 @@
-<button lw-on:click="private()">Private</button>
-<br>
-<div lw>message</div>
-<br>
-<input type="email" placeholder="email" lw-model="email" name="email">
-<br>
-<input type="text" placeholder="name" lw-model="name" name="name">
-<br>
-<input type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
-<br>
-<input type="text" placeholder="Verification Code" lw-model="vCode" name="vCode">
-<br>
-<button lw-on:click="startSignup()">Sign Up</button>
-<button lw-on:click="finishSignup()">Finish Sign Up</button>
-<br>
-<button lw-on:click="startLoginWithCode()">Login with Code</button>
-<button lw-on:click="finishLoginWithCode()">Finish Login with Code</button>
-<br>
-<button lw-on:click="registerPasskey()">Register Passkey</button>
-<button lw-on:click="loginWithPasskey()">Login with Passkey</button>
-<br>
-<button lw-on:click="logout()">Logout</button>
-<button lw-on:click="getUserCredentials()">Get User Credentials</button>
+<div class="ui-panel raised" style="max-width:420px;margin:2rem auto;">
+  <div class="ui-panel-header">
+    <h2 class="ui-panel-title">GoPasskey Demo</h2>
+    <div class="ui-panel-actions">
+      <button class="ui-btn ghost secondary sm" lw-on:click="getUserCredentials()">Credentials</button>
+      <button class="ui-btn outline danger sm" lw-on:click="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="ui-panel-body">
+    <div class="ui-stack">
+
+      <div lw class="ui-alert">message</div>
+
+      <div class="ui-stack sm">
+        <div class="ui-field">
+          <label class="ui-label">Email</label>
+          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+        </div>
+        <div class="ui-field">
+          <label class="ui-label">Name</label>
+          <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
+        </div>
+        <div class="ui-field">
+          <label class="ui-label">Display Name</label>
+          <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
+        </div>
+        <div class="ui-field">
+          <label class="ui-label">Verification Code</label>
+          <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
+        </div>
+      </div>
+
+      <hr class="ui-divider" style="margin:0">
+
+      <div class="ui-stack sm">
+        <div class="ui-row sm">
+          <button class="ui-btn block" lw-on:click="startSignup()">Sign Up</button>
+          <button class="ui-btn outline block" lw-on:click="finishSignup()">Finish Sign Up</button>
+        </div>
+        <div class="ui-row sm">
+          <button class="ui-btn secondary block" lw-on:click="startLoginWithCode()">Login with Code</button>
+          <button class="ui-btn outline secondary block" lw-on:click="finishLoginWithCode()">Finish Login</button>
+        </div>
+        <div class="ui-row sm">
+          <button class="ui-btn success block" lw-on:click="registerPasskey()">Register Passkey</button>
+          <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="ui-panel-footer">
+    <button class="ui-btn ghost secondary sm" lw-on:click="private()">Private Area</button>
+  </div>
+</div>
