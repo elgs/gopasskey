@@ -13,6 +13,11 @@ customElements.define('web-root',
     displayName = '';
     message = '';
     vCode = '';
+    tab = 'signup';
+
+    switchTab(tab) {
+      this.tab = tab;
+    }
 
     async domReady() {
       // console.log('Dom is ready');

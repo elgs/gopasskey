@@ -12,39 +12,73 @@
 
       <div lw class="ui-alert">message</div>
 
-      <div class="ui-stack sm">
-        <div class="ui-field">
-          <label class="ui-label">Email</label>
-          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+      <div class="ui-tabs">
+        <div class="ui-tab-list">
+          <button lw-on:click="switchTab('signup')" lw-class:active="tab === 'signup'" class="ui-tab">Sign Up</button>
+          <button lw-on:click="switchTab('login')" lw-class:active="tab === 'login'" class="ui-tab">Login</button>
+          <button lw-on:click="switchTab('passkey')" lw-class:active="tab === 'passkey'" class="ui-tab">Register Passkey</button>
         </div>
-        <div class="ui-field">
-          <label class="ui-label">Name</label>
-          <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
-        </div>
-        <div class="ui-field">
-          <label class="ui-label">Display Name</label>
-          <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
-        </div>
-        <div class="ui-field">
-          <label class="ui-label">Verification Code</label>
-          <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
-        </div>
-      </div>
 
-      <hr class="ui-divider" style="margin:0">
+        <!-- Sign Up Tab -->
+        <div lw-if="tab === 'signup'" class="ui-tab-panel active">
+          <div class="ui-stack sm">
+            <div class="ui-field">
+              <label class="ui-label">Email</label>
+              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+            </div>
+            <div class="ui-field">
+              <label class="ui-label">Name</label>
+              <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
+            </div>
+            <div class="ui-field">
+              <label class="ui-label">Display Name</label>
+              <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
+            </div>
+            <button class="ui-btn block" lw-on:click="startSignup()">Start Sign Up</button>
+            <div class="ui-field">
+              <label class="ui-label">Verification Code</label>
+              <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
+            </div>
+            <button class="ui-btn outline block" lw-on:click="finishSignup()">Finish Sign Up</button>
+          </div>
+        </div>
 
-      <div class="ui-stack sm">
-        <div class="ui-row sm">
-          <button class="ui-btn block" lw-on:click="startSignup()">Sign Up</button>
-          <button class="ui-btn outline block" lw-on:click="finishSignup()">Finish Sign Up</button>
+        <!-- Login Tab -->
+        <div lw-if="tab === 'login'" class="ui-tab-panel active">
+          <div class="ui-stack sm">
+            <div class="ui-field">
+              <label class="ui-label">Email</label>
+              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+            </div>
+            <div class="ui-row sm">
+              <button class="ui-btn secondary block" lw-on:click="startLoginWithCode()">Login with Code</button>
+              <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+            </div>
+            <div class="ui-field">
+              <label class="ui-label">Verification Code</label>
+              <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
+            </div>
+            <button class="ui-btn outline secondary block" lw-on:click="finishLoginWithCode()">Finish Login</button>
+          </div>
         </div>
-        <div class="ui-row sm">
-          <button class="ui-btn secondary block" lw-on:click="startLoginWithCode()">Login with Code</button>
-          <button class="ui-btn outline secondary block" lw-on:click="finishLoginWithCode()">Finish Login</button>
-        </div>
-        <div class="ui-row sm">
-          <button class="ui-btn success block" lw-on:click="registerPasskey()">Register Passkey</button>
-          <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+
+        <!-- Register Passkey Tab -->
+        <div lw-if="tab === 'passkey'" class="ui-tab-panel active">
+          <div class="ui-stack sm">
+            <div class="ui-field">
+              <label class="ui-label">Email</label>
+              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+            </div>
+            <div class="ui-field">
+              <label class="ui-label">Name</label>
+              <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
+            </div>
+            <div class="ui-field">
+              <label class="ui-label">Display Name</label>
+              <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
+            </div>
+            <button class="ui-btn success block" lw-on:click="registerPasskey()">Register Passkey</button>
+          </div>
         </div>
       </div>
 
