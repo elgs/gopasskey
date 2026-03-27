@@ -393,7 +393,7 @@ func Auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: url to redirect to should be passed as a parameter
 
-		if strings.HasPrefix(r.URL.Path, "/api/pub/") {
+		if !strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/api/pub/") {
 			next.ServeHTTP(w, r)
 			return
 		}

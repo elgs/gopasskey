@@ -11,6 +11,10 @@ customElements.define('web-root',
     email = '';
     message = '';
     loggedIn = false;
+    emailLoading = false;
+    passkeyLoading = false;
+    registerLoading = false;
+    logoutLoading = false;
 
     async domReady() {
       // Check for sid in URL query params (from magic link redirect)
@@ -53,12 +57,20 @@ customElements.define('web-root',
       }
     }
 
+    async onEmailKeydown(event) {
+      if (event.key === 'Enter') {
+        await this.loginWithEmail();
+      }
+    }
+
     async loginWithEmail() {
       if (!this.email) {
         this.message = 'Please enter your email';
         return;
       }
 
+      this.emailLoading = true;
+      this.update();
       try {
         const response = await fetch(`${env.pubApiUrl}login_start`, {
           method: 'POST',
@@ -74,17 +86,21 @@ customElements.define('web-root',
         }
       } catch (error) {
         this.message = 'Error: ' + error.message;
+      } finally {
+        this.emailLoading = false;
       }
     }
 
     async registerPasskey() {
-      try {
-        const sid = localStorage.getItem('sid');
-        if (!sid) {
-          this.message = 'Not logged in';
-          return;
-        }
+      const sid = localStorage.getItem('sid');
+      if (!sid) {
+        this.message = 'Not logged in';
+        return;
+      }
 
+      this.registerLoading = true;
+      this.update();
+      try {
         const response = await fetch(`${env.pubApiUrl}register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -118,6 +134,8 @@ customElements.define('web-root',
         }
       } catch (error) {
         this.message = 'Error: ' + error.message;
+      } finally {
+        this.registerLoading = false;
       }
     }
 
@@ -127,6 +145,8 @@ customElements.define('web-root',
         return;
       }
 
+      this.passkeyLoading = true;
+      this.update();
       try {
         const response = await fetch(`${env.pubApiUrl}passkey_login_start`, {
           method: 'POST',
@@ -169,10 +189,14 @@ customElements.define('web-root',
         }
       } catch (error) {
         this.message = 'Error: ' + error.message;
+      } finally {
+        this.passkeyLoading = false;
       }
     }
 
     async logout() {
+      this.logoutLoading = true;
+      this.update();
       try {
         const sid = localStorage.getItem('sid');
         const response = await fetch(`${env.apiUrl}logout`, {
@@ -191,53 +215,8 @@ customElements.define('web-root',
         }
       } catch (error) {
         this.message = 'Error: ' + error.message;
-      }
-    }
-
-    async private() {
-      try {
-        const sid = localStorage.getItem('sid');
-        if (!sid) {
-          this.message = 'Not logged in';
-          return;
-        }
-
-        const response = await fetch(`${env.apiUrl}private`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
-        });
-
-        const msg = await response.json();
-        if (response.ok) {
-          this.message = msg;
-        } else {
-          this.message = 'Error: ' + msg;
-        }
-      } catch (error) {
-        this.message = 'Error: ' + error.message;
-      }
-    }
-
-    async getUserCredentials() {
-      try {
-        const sid = localStorage.getItem('sid');
-        if (!sid) {
-          this.message = 'Not logged in';
-          return;
-        }
-
-        const response = await fetch(`${env.apiUrl}credentials`, {
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
-        });
-
-        const msg = await response.json();
-        if (response.ok) {
-          this.message = JSON.stringify(msg);
-        } else {
-          this.message = 'Error: ' + msg;
-        }
-      } catch (error) {
-        this.message = 'Error: ' + error.message;
+      } finally {
+        this.logoutLoading = false;
       }
     }
   }

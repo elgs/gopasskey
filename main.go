@@ -13,8 +13,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/justinas/alice"
-	"github.com/redis/go-redis/v9"
+"github.com/redis/go-redis/v9"
 )
 
 var env = os.Getenv("ENV")
@@ -51,8 +50,6 @@ func main() {
 
 func initApiServer() {
 
-	chain := alice.New(Auth)
-
 	mux := http.NewServeMux()
 
 	if env == "dev" {
@@ -68,20 +65,19 @@ func initApiServer() {
 
 	mux.Handle("GET /", http.FileServer(http.FS(staticFS)))
 
-	mux.Handle("POST /api/pub/login_start", chain.ThenFunc(BeginEmailLogin))
-	mux.Handle("GET /api/pub/verify_login", chain.ThenFunc(VerifyLoginLink))
-	mux.Handle("POST /api/pub/register_start", chain.ThenFunc(BeginRegistration))
-	mux.Handle("POST /api/pub/register_finish", chain.ThenFunc(FinishRegistration))
-	mux.Handle("POST /api/pub/passkey_login_start", chain.ThenFunc(BeginLogin))
-	mux.Handle("POST /api/pub/passkey_login_finish", chain.ThenFunc(FinishLogin))
+	mux.HandleFunc("POST /api/pub/login_start", BeginEmailLogin)
+	mux.HandleFunc("GET /api/pub/verify_login", VerifyLoginLink)
+	mux.HandleFunc("POST /api/pub/register_start", BeginRegistration)
+	mux.HandleFunc("POST /api/pub/register_finish", FinishRegistration)
+	mux.HandleFunc("POST /api/pub/passkey_login_start", BeginLogin)
+	mux.HandleFunc("POST /api/pub/passkey_login_finish", FinishLogin)
 
-	mux.Handle("POST /api/logout", chain.ThenFunc(Logout))
-	mux.Handle("GET /api/credentials", chain.ThenFunc(GetUserCredentials))
-	mux.Handle("GET /api/private", chain.ThenFunc(Private))
-	mux.Handle("GET /api/me", chain.ThenFunc(Me))
+	mux.HandleFunc("POST /api/logout", Logout)
+	mux.HandleFunc("GET /api/credentials", GetUserCredentials)
+	mux.HandleFunc("GET /api/private", Private)
+	mux.HandleFunc("GET /api/me", Me)
 
-	// Wrap entire mux with CORS so OPTIONS preflight is handled before route matching
-	handler := CORS(mux)
+	handler := CORS(Auth(mux))
 	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), handler); err != nil {
 		log.Println(err)
 	}

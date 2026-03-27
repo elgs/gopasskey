@@ -2,25 +2,24 @@
   <div class="ui-panel-header">
     <h2 class="ui-panel-title">GoPasskey</h2>
     <div class="ui-panel-actions">
-      <button lw-if="loggedIn" class="ui-btn ghost secondary sm" lw-on:click="getUserCredentials()">Credentials</button>
-      <button lw-if="loggedIn" class="ui-btn outline danger sm" lw-on:click="logout()">Logout</button>
+      <button lw-if="loggedIn" class="ui-btn outline danger sm" lw-class:loading="logoutLoading" lw-on:click="logout()">Logout</button>
     </div>
   </div>
 
   <div class="ui-panel-body">
     <div class="ui-stack">
 
-      <div lw class="ui-alert">message</div>
+      <div lw lw-if="message" class="ui-alert">message</div>
 
       <!-- Login form (shown when not logged in) -->
       <div lw-if="!loggedIn" class="ui-stack sm">
         <div class="ui-field">
           <label class="ui-label">Email</label>
-          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
+          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email" lw-on:keydown="onEmailKeydown($event)" autofocus>
         </div>
         <div class="ui-row sm">
-          <button class="ui-btn block" lw-on:click="loginWithEmail()">Login with Email</button>
-          <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+          <button class="ui-btn block" lw-class:loading="emailLoading" lw-on:click="loginWithEmail()">Login with Email</button>
+          <button class="ui-btn outline success block" lw-class:loading="passkeyLoading" lw-on:click="loginWithPasskey()">Login with Passkey</button>
         </div>
       </div>
 
@@ -30,13 +29,9 @@
           <label class="ui-label">Email</label>
           <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email" disabled>
         </div>
-        <button class="ui-btn success block" lw-on:click="registerPasskey()">Add Passkey</button>
+        <button class="ui-btn success block" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
       </div>
 
     </div>
-  </div>
-
-  <div lw-if="loggedIn" class="ui-panel-footer">
-    <button class="ui-btn ghost secondary sm" lw-on:click="private()">Private Area</button>
   </div>
 </div>
