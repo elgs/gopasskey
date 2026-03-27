@@ -51,7 +51,7 @@ func main() {
 
 func initApiServer() {
 
-	chain := alice.New(CORS, Auth)
+	chain := alice.New(Auth)
 
 	mux := http.NewServeMux()
 
@@ -66,23 +66,23 @@ func initApiServer() {
 		}
 	}
 
-	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+	mux.Handle("GET /", http.FileServer(http.FS(staticFS)))
 
-	mux.Handle("/api/pub/signup_start", chain.ThenFunc(BeginSignup))
-	mux.Handle("/api/pub/signup_finish", chain.ThenFunc(FinishSignup))
-	mux.Handle("/api/pub/login_with_code_start", chain.ThenFunc(BeginLoginWithCode))
-	mux.Handle("/api/pub/login_with_code_finish", chain.ThenFunc(FinishLoginWithCode))
-	mux.Handle("/api/pub/register_start", chain.ThenFunc(BeginRegistration))
-	mux.Handle("/api/pub/register_finish", chain.ThenFunc(FinishRegistration))
-	mux.Handle("/api/pub/login_start", chain.ThenFunc(BeginLogin))
-	mux.Handle("/api/pub/login_finish", chain.ThenFunc(FinishLogin))
+	mux.Handle("POST /api/pub/login_start", chain.ThenFunc(BeginEmailLogin))
+	mux.Handle("GET /api/pub/verify_login", chain.ThenFunc(VerifyLoginLink))
+	mux.Handle("POST /api/pub/register_start", chain.ThenFunc(BeginRegistration))
+	mux.Handle("POST /api/pub/register_finish", chain.ThenFunc(FinishRegistration))
+	mux.Handle("POST /api/pub/passkey_login_start", chain.ThenFunc(BeginLogin))
+	mux.Handle("POST /api/pub/passkey_login_finish", chain.ThenFunc(FinishLogin))
 
-	mux.Handle("/api/logout", chain.ThenFunc(Logout))
-	mux.Handle("/api/credentials", chain.ThenFunc(GetUserCredentials))
-	mux.Handle("/api/private", chain.ThenFunc(Private))
-	mux.Handle("/api/me", chain.ThenFunc(Me))
+	mux.Handle("POST /api/logout", chain.ThenFunc(Logout))
+	mux.Handle("GET /api/credentials", chain.ThenFunc(GetUserCredentials))
+	mux.Handle("GET /api/private", chain.ThenFunc(Private))
+	mux.Handle("GET /api/me", chain.ThenFunc(Me))
 
-	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), mux); err != nil {
+	// Wrap entire mux with CORS so OPTIONS preflight is handled before route matching
+	handler := CORS(mux)
+	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), handler); err != nil {
 		log.Println(err)
 	}
 }

@@ -122,6 +122,71 @@ type Req struct {
 	Code  string `json:"code"`
 }
 
+////////////////////////
+//                    //
+//    UserLogin       //
+//                    //
+////////////////////////
+
+type UserLogin struct {
+	ID      string     `json:"id" db:"id" pk:"true"`
+	Email   *string    `json:"email" db:"email"`
+	Token   *string    `json:"token" db:"token"`
+	Expires *time.Time `json:"expires" db:"expires"`
+	Used    *bool      `json:"used" db:"used"`
+	Created *time.Time `json:"created" db:"created"`
+}
+
+func CreateUserLogin(email, token string, expires time.Time) (*UserLogin, error) {
+	id := uuid.New().String()
+	used := false
+	now := time.Now()
+	login := &UserLogin{
+		ID:      id,
+		Email:   &email,
+		Token:   &token,
+		Expires: &expires,
+		Used:    &used,
+		Created: &now,
+	}
+	result, err := gosqlcrud.Create(db, login, "user_login")
+	if err != nil {
+		return nil, err
+	}
+	if result.RowsAffected == 0 {
+		return nil, fmt.Errorf("no rows affected")
+	}
+	return login, nil
+}
+
+func GetUserLoginByToken(token string) (*UserLogin, error) {
+	logins := []UserLogin{}
+	err := gosqlcrud.QueryToStructs(db, &logins, "SELECT * FROM user_login WHERE token = ? AND used = 0 AND expires > NOW()", token)
+	if err != nil {
+		return nil, err
+	}
+	if len(logins) == 0 {
+		return nil, fmt.Errorf("login token not found or expired")
+	}
+	return &logins[0], nil
+}
+
+func MarkUserLoginUsed(id string) error {
+	used := true
+	login := &UserLogin{
+		ID:   id,
+		Used: &used,
+	}
+	result, err := gosqlcrud.Update(db, login, "user_login")
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no rows affected")
+	}
+	return nil
+}
+
 /////////////////////////////////
 //                             //
 //    PasskeyUserCredential    //

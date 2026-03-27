@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elgs/gostrgen"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
 )
@@ -34,188 +33,124 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, map[string]any{"credentialIds": credentialIds}, http.StatusOK)
 }
 
-///////////////////////
-//                   //
-//    BeginSignup    //
-//                   //
-///////////////////////
+/////////////////////////////
+//                         //
+//    BeginEmailLogin      //
+//                         //
+/////////////////////////////
 
-func BeginSignup(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] begin sign up ----------------------\\")
-	u, err := getUserData(r)
-	if err != nil {
-		log.Printf("[ERRO] can't get user name: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	// Check if user already exists
-	existingUser, err := GetUserByEmail(u.Email)
-	if err == nil && existingUser != nil {
-		msg := fmt.Sprintf("user with email %s already exists", u.Email)
-		log.Printf("[ERRO] %s", msg)
-		JSONResponse(w, msg, http.StatusBadRequest)
-		return
-	}
-
-	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
-	verificationCode := gostrgen.RandGen(6, gostrgen.Upper|gostrgen.Digit, "", "")
-	redisClient.Set(ctx, fmt.Sprintf("passkey_signup_code:%s", verificationCode), fmt.Sprintf("%s|%s|%s", u.Email, u.Name, u.DisplayName), time.Minute*10)
-
-	// Log the verification code to the console (for testing purposes only)
-	log.Printf("[INFO] verification code: %s", verificationCode)
-
-	// Send the verification code to the user's email
-	err = SendMail(u.Email, "Your verification code", fmt.Sprintf("Your verification code is: %s", verificationCode))
-	if err != nil {
-		log.Printf("[ERRO] can't send verification email: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	JSONResponse(w, "Verification code sent to email", http.StatusOK)
-
-}
-
-////////////////////////
-//                    //
-//    FinishSignup    //
-//                    //
-////////////////////////
-
-func FinishSignup(w http.ResponseWriter, r *http.Request) {
-	req := &Req{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		JSONResponse(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	// Check if the verification code is valid
-	val, err := redisClient.Get(ctx, fmt.Sprintf("passkey_signup_code:%s", req.Code)).Result()
-	if err != nil {
-		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
-		return
-	}
-
-	// Parse the user data from the Redis value
-	parts := strings.Split(val, "|")
-	if len(parts) != 3 {
-		JSONResponse(w, "Invalid verification code data", http.StatusBadRequest)
-		return
-	}
-	u := &PasskeyUser{
-		Email:       parts[0],
-		Name:        parts[1],
-		DisplayName: parts[2],
-	}
-
-	if u.Email != req.Email {
-		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
-		return
-	}
-
-	_, err = CreateUser(u.Email, u.Name, u.DisplayName)
-	if err != nil {
-		msg := fmt.Sprintf("can't create user: %s", err.Error())
-		log.Printf("[ERRO] %s", msg)
-		JSONResponse(w, msg, http.StatusBadRequest)
-		return
-	}
-
-	// Delete the signup code
-	redisClient.Del(ctx, fmt.Sprintf("passkey_signup_code:%s", req.Code))
-
-	JSONResponse(w, "Signup successful", http.StatusOK)
-
-	log.Printf("[INFO] finish sign up ----------------------/")
-}
-
-//////////////////////////////
-//                          //
-//    BeginLoginWithCode    //
-//                          //
-//////////////////////////////
-
-func BeginLoginWithCode(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] begin login with code ----------------------\\")
+func BeginEmailLogin(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] begin email login ----------------------\\")
 
 	u, err := getUserData(r)
 	if err != nil {
-		log.Printf("[ERRO]can't get user name: %s", err.Error())
+		log.Printf("[ERRO] can't get user data: %s", err.Error())
 		JSONResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	user, err := GetUserByEmail(u.Email) // Find the user
+	if u.Email == "" {
+		JSONResponse(w, "Email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Check if user exists; if not, create one
+	_, err = GetUserByEmail(u.Email)
 	if err != nil {
-		log.Printf("[ERRO] can't get user: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
-		return
+		// User doesn't exist, create a new one with email as name
+		_, err = CreateUser(u.Email, u.Email, u.Email)
+		if err != nil {
+			msg := fmt.Sprintf("can't create user: %s", err.Error())
+			log.Printf("[ERRO] %s", msg)
+			JSONResponse(w, msg, http.StatusInternalServerError)
+			return
+		}
+		log.Printf("[INFO] created new user for email: %s", u.Email)
 	}
 
-	// create a random verification code, and together with the user data, save it in redis with a 10 minute expiration, and send the code to the user's email
-	verificationCode := gostrgen.RandGen(6, gostrgen.Upper|gostrgen.Digit, "", "")
-	redisClient.Set(ctx, fmt.Sprintf("passkey_login_code:%s", verificationCode), user.ID, time.Minute*10)
+	// Generate a random token for the magic link
+	token := uuid.New().String()
+	expires := time.Now().Add(10 * time.Minute)
 
-	// Log the verification code to the console (for testing purposes only)
-	log.Printf("[INFO] login verification code: %s", verificationCode)
-
-	// Send the verification code to the user's email
-	err = SendMail(u.Email, "Your login verification code", fmt.Sprintf("Your login verification code is: %s", verificationCode))
+	_, err = CreateUserLogin(u.Email, token, expires)
 	if err != nil {
-		log.Printf("[ERRO] can't send verification email: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		log.Printf("[ERRO] can't create login token: %s", err.Error())
+		JSONResponse(w, "Failed to create login token", http.StatusInternalServerError)
 		return
 	}
-	JSONResponse(w, "Login verification code sent to email", http.StatusOK) // return the options generated with the session key
-	// options.publicKey contain our registration options
+
+	// Build the magic link URL
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if fwdProto := r.Header.Get("X-Forwarded-Proto"); fwdProto != "" {
+		scheme = fwdProto
+	}
+	loginLink := fmt.Sprintf("%s://%s/api/pub/verify_login?token=%s", scheme, r.Host, token)
+
+	log.Printf("[INFO] login link: %s", loginLink)
+
+	// Send the magic link to the user's email
+	err = SendMail(u.Email, "Your login link", fmt.Sprintf("Click the link below to log in:\n\n%s\n\nThis link expires in 10 minutes.", loginLink))
+	if err != nil {
+		log.Printf("[ERRO] can't send login email: %s", err.Error())
+		JSONResponse(w, "Failed to send login email", http.StatusInternalServerError)
+		return
+	}
+
+	JSONResponse(w, "Login link sent to your email", http.StatusOK)
+	log.Printf("[INFO] end email login ----------------------/")
 }
 
-///////////////////////////////
-//                           //
-//    FinishLoginWithCode    //
-//                           //
-///////////////////////////////
+/////////////////////////////
+//                         //
+//    VerifyLoginLink      //
+//                         //
+/////////////////////////////
 
-func FinishLoginWithCode(w http.ResponseWriter, r *http.Request) {
-	req := &Req{}
-	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
-		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+func VerifyLoginLink(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] verify login link ----------------------\\")
+
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "Missing token", http.StatusBadRequest)
 		return
 	}
 
-	// Check if the verification code is valid
-	userID, err := redisClient.Get(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code)).Result()
+	// Look up the token in the user_login table
+	userLogin, err := GetUserLoginByToken(token)
 	if err != nil {
-		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
+		log.Printf("[ERRO] invalid login token: %s", err.Error())
+		http.Error(w, "Invalid or expired login link", http.StatusBadRequest)
 		return
 	}
 
-	user, err := GetUser(userID)
+	// Mark the token as used
+	err = MarkUserLoginUsed(userLogin.ID)
+	if err != nil {
+		log.Printf("[ERRO] can't mark login token as used: %s", err.Error())
+	}
+
+	// Find the user
+	user, err := GetUserByEmail(*userLogin.Email)
 	if err != nil {
 		log.Printf("[ERRO] can't get user: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, "User not found", http.StatusBadRequest)
 		return
 	}
 
-	if user.Email != req.Email {
-		JSONResponse(w, "Invalid or expired verification code", http.StatusBadRequest)
-		return
-	}
-
-	// create a session for the user
+	// Create a session for the user
 	sessionID := uuid.New().String()
 	SaveSession(sessionID, &webauthn.SessionData{
 		UserID:  []byte(user.ID),
 		Expires: time.Now().Add(time.Hour),
-	}, time.Hour) // save session for 1 hour
-	w.Header().Set("sid", sessionID)
+	}, time.Hour)
 
-	// Delete the login code
-	redisClient.Del(ctx, fmt.Sprintf("passkey_login_code:%s", req.Code))
+	// Redirect to frontend with session ID
+	http.Redirect(w, r, fmt.Sprintf("/?sid=%s", sessionID), http.StatusFound)
 
-	JSONResponse(w, "Login successful", http.StatusOK)
-
-	log.Printf("[INFO] finish login with code ----------------------/")
+	log.Printf("[INFO] verify login link ----------------------/")
 }
 
 /////////////////////////////

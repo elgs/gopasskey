@@ -1,2 +1,5 @@
 .envrc
 web/build
+web/dist
+gopasskey
+CLAUDE.md

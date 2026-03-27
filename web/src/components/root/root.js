@@ -9,146 +9,101 @@ customElements.define('web-root',
     }
 
     email = '';
-    name = '';
-    displayName = '';
     message = '';
-    vCode = '';
-    tab = 'signup';
-
-    switchTab(tab) {
-      this.tab = tab;
-    }
+    loggedIn = false;
 
     async domReady() {
-      // console.log('Dom is ready');
-      const sid = localStorage.getItem('sid');
+      // Check for sid in URL query params (from magic link redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const sid = urlParams.get('sid');
       if (sid) {
-        await this.private();
+        localStorage.setItem('sid', sid);
+        // Clean the URL
+        window.history.replaceState({}, document.title, '/');
+      }
+
+      const storedSid = localStorage.getItem('sid');
+      if (storedSid) {
+        await this.checkSession();
       }
     }
 
-    async startSignup() {
+    async checkSession() {
       try {
-        // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.pubApiUrl}signup_start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
+        const sid = localStorage.getItem('sid');
+        if (!sid) return;
+
+        const response = await fetch(`${env.apiUrl}me`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', 'sid': sid }
         });
 
-        // Check if the signup options are ok.
-        if (!response.ok) {
-          const msg = await response.json();
-          throw new Error('User already exists or failed to get signup options from server: ' + msg);
+        if (response.ok) {
+          const user = await response.json();
+          this.email = user.email;
+          this.loggedIn = true;
+          this.message = `Logged in as ${user.email}`;
+        } else {
+          localStorage.removeItem('sid');
+          this.loggedIn = false;
         }
-
-        const msg = await response.json();
-        this.message = msg;
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        localStorage.removeItem('sid');
+        this.loggedIn = false;
       }
     }
 
-    async finishSignup() {
-      try {
-        // Get signup options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.pubApiUrl}signup_finish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.email, code: this.vCode })
-        });
-
-        // Check if the signup options are ok.
-        if (!response.ok) {
-          const msg = await response.json();
-          throw new Error('Failed to finish signup on server: ' + msg);
-        }
-
-        const msg = await response.json();
-        this.message = msg;
-      } catch (error) {
-        this.message = 'Error: ' + error.message;
+    async loginWithEmail() {
+      if (!this.email) {
+        this.message = 'Please enter your email';
+        return;
       }
-    }
 
-    async startLoginWithCode() {
       try {
-        // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.pubApiUrl}login_with_code_start`, {
+        const response = await fetch(`${env.pubApiUrl}login_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
         });
 
-        // Check if the login options are ok.
-        if (!response.ok) {
-          const msg = await response.json();
-          throw new Error('Failed to get login options from server: ' + msg);
-        }
-
         const msg = await response.json();
-        this.message = msg;
-      } catch (error) {
-        this.message = 'Error: ' + error.message;
-      }
-    }
-
-    async finishLoginWithCode() {
-      try {
-        // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.pubApiUrl}login_with_code_finish`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.email, code: this.vCode })
-        });
-
-        // Check if the login options are ok.
-        if (!response.ok) {
-          const msg = await response.json();
-          throw new Error('Failed to finish login with code on server: ' + msg);
+        if (response.ok) {
+          this.message = msg;
+        } else {
+          this.message = 'Error: ' + msg;
         }
-
-        const sid = response.headers.get('sid');
-        if (sid) {
-          localStorage.setItem('sid', sid);
-        }
-
-        const msg = await response.json();
-        this.message = msg;
       } catch (error) {
         this.message = 'Error: ' + error.message;
       }
     }
 
     async registerPasskey() {
-      // Retrieve the username from the input field
       try {
-        // Get registration options from your server. Here, we also receive the challenge.
+        const sid = localStorage.getItem('sid');
+        if (!sid) {
+          this.message = 'Not logged in';
+          return;
+        }
+
         const response = await fetch(`${env.pubApiUrl}register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: this.email, name: this.name, display_name: this.displayName })
+          body: JSON.stringify({ email: this.email })
         });
 
-        // Check if the registration options are ok.
         if (!response.ok) {
           const msg = await response.json();
-          throw new Error('User already exists or failed to get registration options from server: ' + msg);
+          throw new Error('Failed to get registration options: ' + msg);
         }
 
-        // read register_sid from response header
         const registerSid = response.headers.get('register_sid');
         if (!registerSid) {
           throw new Error('No register_sid in response header');
         }
 
-        // Convert the registration options to JSON.
         const options = await response.json();
 
-        // This triggers the browser to display the passkey / WebAuthn modal (e.g. Face ID, Touch ID, Windows Hello).
-        // A new attestation is created. This also means a new public-private-key pair is created.
         const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options.publicKey });
-        // Send attestationResponse back to server for verification and storage.
         const verificationResponse = await fetch(`${env.pubApiUrl}register_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'register_sid': registerSid },
@@ -167,35 +122,33 @@ customElements.define('web-root',
     }
 
     async loginWithPasskey() {
-      // Retrieve the username from the input field
+      if (!this.email) {
+        this.message = 'Please enter your email';
+        return;
+      }
+
       try {
-        // Get login options from your server. Here, we also receive the challenge.
-        const response = await fetch(`${env.pubApiUrl}login_start`, {
+        const response = await fetch(`${env.pubApiUrl}passkey_login_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
         });
-        // Check if the login options are ok.
+
         if (!response.ok) {
           const msg = await response.json();
-          throw new Error('Failed to get login options from server: ' + msg);
+          throw new Error('Failed to get login options: ' + msg);
         }
 
-        // read login_sid from response header
         const loginSid = response.headers.get('login_sid');
         if (!loginSid) {
           throw new Error('No login_sid in response header');
         }
 
-        // Convert the login options to JSON.
         const options = await response.json();
 
-        // This triggers the browser to display the passkey / WebAuthn modal (e.g. Face ID, Touch ID, Windows Hello).
-        // A new assertionResponse is created. This also means that the challenge has been signed.
         const assertionResponse = await SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: options.publicKey });
 
-        // Send assertionResponse back to server for verification.
-        const verificationResponse = await fetch(`${env.pubApiUrl}login_finish`, {
+        const verificationResponse = await fetch(`${env.pubApiUrl}passkey_login_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'login_sid': loginSid },
           body: JSON.stringify(assertionResponse)
@@ -208,7 +161,9 @@ customElements.define('web-root',
 
         const msg = await verificationResponse.json();
         if (verificationResponse.ok) {
+          this.loggedIn = true;
           this.message = msg;
+          await this.checkSession();
         } else {
           this.message = 'Error: ' + msg;
         }
@@ -228,6 +183,8 @@ customElements.define('web-root',
         const msg = await response.json();
         if (response.ok) {
           localStorage.removeItem('sid');
+          this.loggedIn = false;
+          this.email = '';
           this.message = msg;
         } else {
           this.message = 'Error: ' + msg;
@@ -263,7 +220,6 @@ customElements.define('web-root',
 
     async getUserCredentials() {
       try {
-
         const sid = localStorage.getItem('sid');
         if (!sid) {
           this.message = 'Not logged in';

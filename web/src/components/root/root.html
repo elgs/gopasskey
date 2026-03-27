@@ -1,9 +1,9 @@
-<div class="ui-panel raised" style="max-width:420px;margin:2rem auto;">
+<div class="ui-panel raised login-panel">
   <div class="ui-panel-header">
-    <h2 class="ui-panel-title">GoPasskey Demo</h2>
+    <h2 class="ui-panel-title">GoPasskey</h2>
     <div class="ui-panel-actions">
-      <button class="ui-btn ghost secondary sm" lw-on:click="getUserCredentials()">Credentials</button>
-      <button class="ui-btn outline danger sm" lw-on:click="logout()">Logout</button>
+      <button lw-if="loggedIn" class="ui-btn ghost secondary sm" lw-on:click="getUserCredentials()">Credentials</button>
+      <button lw-if="loggedIn" class="ui-btn outline danger sm" lw-on:click="logout()">Logout</button>
     </div>
   </div>
 
@@ -12,80 +12,31 @@
 
       <div lw class="ui-alert">message</div>
 
-      <div class="ui-tabs">
-        <div class="ui-tab-list">
-          <button lw-on:click="switchTab('signup')" lw-class:active="tab === 'signup'" class="ui-tab">Sign Up</button>
-          <button lw-on:click="switchTab('login')" lw-class:active="tab === 'login'" class="ui-tab">Login</button>
-          <button lw-on:click="switchTab('passkey')" lw-class:active="tab === 'passkey'" class="ui-tab">Register Passkey</button>
+      <!-- Login form (shown when not logged in) -->
+      <div lw-if="!loggedIn" class="ui-stack sm">
+        <div class="ui-field">
+          <label class="ui-label">Email</label>
+          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
         </div>
+        <div class="ui-row sm">
+          <button class="ui-btn block" lw-on:click="loginWithEmail()">Login with Email</button>
+          <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+        </div>
+      </div>
 
-        <!-- Sign Up Tab -->
-        <div lw-if="tab === 'signup'" class="ui-tab-panel active">
-          <div class="ui-stack sm">
-            <div class="ui-field">
-              <label class="ui-label">Email</label>
-              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
-            </div>
-            <div class="ui-field">
-              <label class="ui-label">Name</label>
-              <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
-            </div>
-            <div class="ui-field">
-              <label class="ui-label">Display Name</label>
-              <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
-            </div>
-            <button class="ui-btn block" lw-on:click="startSignup()">Start Sign Up</button>
-            <div class="ui-field">
-              <label class="ui-label">Verification Code</label>
-              <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
-            </div>
-            <button class="ui-btn outline block" lw-on:click="finishSignup()">Finish Sign Up</button>
-          </div>
+      <!-- Post-login actions (shown when logged in) -->
+      <div lw-if="loggedIn" class="ui-stack sm">
+        <div class="ui-field">
+          <label class="ui-label">Email</label>
+          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email" disabled>
         </div>
-
-        <!-- Login Tab -->
-        <div lw-if="tab === 'login'" class="ui-tab-panel active">
-          <div class="ui-stack sm">
-            <div class="ui-field">
-              <label class="ui-label">Email</label>
-              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
-            </div>
-            <div class="ui-row sm">
-              <button class="ui-btn secondary block" lw-on:click="startLoginWithCode()">Login with Code</button>
-              <button class="ui-btn outline success block" lw-on:click="loginWithPasskey()">Login with Passkey</button>
-            </div>
-            <div class="ui-field">
-              <label class="ui-label">Verification Code</label>
-              <input class="ui-input" type="text" placeholder="123456" lw-model="vCode" name="vCode">
-            </div>
-            <button class="ui-btn outline secondary block" lw-on:click="finishLoginWithCode()">Finish Login</button>
-          </div>
-        </div>
-
-        <!-- Register Passkey Tab -->
-        <div lw-if="tab === 'passkey'" class="ui-tab-panel active">
-          <div class="ui-stack sm">
-            <div class="ui-field">
-              <label class="ui-label">Email</label>
-              <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email">
-            </div>
-            <div class="ui-field">
-              <label class="ui-label">Name</label>
-              <input class="ui-input" type="text" placeholder="Name" lw-model="name" name="name">
-            </div>
-            <div class="ui-field">
-              <label class="ui-label">Display Name</label>
-              <input class="ui-input" type="text" placeholder="Display Name" lw-model="displayName" name="displayName">
-            </div>
-            <button class="ui-btn success block" lw-on:click="registerPasskey()">Register Passkey</button>
-          </div>
-        </div>
+        <button class="ui-btn success block" lw-on:click="registerPasskey()">Add Passkey</button>
       </div>
 
     </div>
   </div>
 
-  <div class="ui-panel-footer">
+  <div lw-if="loggedIn" class="ui-panel-footer">
     <button class="ui-btn ghost secondary sm" lw-on:click="private()">Private Area</button>
   </div>
 </div>
