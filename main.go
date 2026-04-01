@@ -69,16 +69,20 @@ func initApiServer() {
 	mux.HandleFunc("GET /api/pub/verify_login", VerifyLoginLink)
 	mux.HandleFunc("POST /api/pub/register_start", BeginRegistration)
 	mux.HandleFunc("POST /api/pub/register_finish", FinishRegistration)
+	mux.HandleFunc("POST /api/pub/register_confirm", ConfirmRegistration)
 	mux.HandleFunc("POST /api/pub/passkey_login_start", BeginLogin)
 	mux.HandleFunc("POST /api/pub/passkey_login_finish", FinishLogin)
 
 	mux.HandleFunc("POST /api/logout", Logout)
 	mux.HandleFunc("GET /api/credentials", GetUserCredentials)
-	mux.HandleFunc("GET /api/private", Private)
+	mux.HandleFunc("DELETE /api/credentials", DeleteUserCredential)
+	mux.HandleFunc("PUT /api/profile", UpdateProfile)
 	mux.HandleFunc("GET /api/me", Me)
 
 	handler := CORS(Auth(mux))
-	if err := http.ListenAndServe(fmt.Sprintf("%s:%s", host, port), handler); err != nil {
+	addr := fmt.Sprintf("%s:%s", host, port)
+	log.Printf("Listening on http://%s\n", addr)
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Println(err)
 	}
 }

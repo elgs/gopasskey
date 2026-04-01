@@ -23,11 +23,33 @@
         </div>
       </div>
 
-      <!-- Post-login actions (shown when logged in) -->
+      <!-- Post-login: Profile -->
       <div lw-if="loggedIn" class="ui-stack sm">
         <div class="ui-field">
           <label class="ui-label">Email</label>
-          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email" disabled>
+          <input class="ui-input" type="email" lw-model="email" disabled>
+        </div>
+        <div class="ui-field">
+          <label class="ui-label">Name</label>
+          <input class="ui-input" type="text" placeholder="Name" lw-model="userName">
+        </div>
+        <div class="ui-field">
+          <label class="ui-label">Display Name</label>
+          <input class="ui-input" type="text" placeholder="Display Name" lw-model="userDisplayName">
+        </div>
+        <button class="ui-btn block" lw-class:loading="profileLoading" lw-on:click="saveProfile()">Save Profile</button>
+      </div>
+
+      <!-- Post-login: Passkeys -->
+      <div lw-if="loggedIn" class="ui-stack sm">
+        <label class="ui-label">Passkeys</label>
+        <div lw-if="credentials.length === 0" class="ui-text secondary">No passkeys registered.</div>
+        <div lw-for="cred in credentials" class="ui-row sm credential-row">
+          <div class="credential-info">
+            <div lw class="credential-label">cred.label || 'Unnamed'</div>
+            <div lw class="credential-date">cred.created</div>
+          </div>
+          <button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button>
         </div>
         <button class="ui-btn success block" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
       </div>
@@ -35,3 +57,15 @@
     </div>
   </div>
 </div>
+
+<!-- Confirmation dialog -->
+<dialog class="ui-dialog sm confirm-dialog">
+  <div class="ui-dialog-header">
+    <h3 lw class="ui-dialog-title">confirmTitle</h3>
+  </div>
+  <div lw class="ui-dialog-body">confirmMessage</div>
+  <div class="ui-dialog-footer">
+    <button class="ui-btn outline sm" lw-on:click="onConfirm(false)">Cancel</button>
+    <button lw class="ui-btn sm" lw-class:danger="confirmDanger" lw-on:click="onConfirm(true)">confirmAction</button>
+  </div>
+</dialog>

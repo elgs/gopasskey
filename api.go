@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// GetUserCredentials returns credential IDs for a user as base64url strings
+// GetUserCredentials returns credentials for a user
 func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 	sid := r.Header.Get("sid")
 	session, err := GetSession(sid)
@@ -26,11 +26,96 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	creds := user.Credentials()
-	var credentialIds []string
-	for _, cred := range creds {
-		credentialIds = append(credentialIds, *cred.Label)
+	type credInfo struct {
+		ID      string `json:"id"`
+		Label   string `json:"label"`
+		Created string `json:"created"`
 	}
-	JSONResponse(w, map[string]any{"credentialIds": credentialIds}, http.StatusOK)
+	var result []credInfo
+	for _, cred := range creds {
+		label := ""
+		if cred.Label != nil {
+			label = *cred.Label
+		}
+		created := ""
+		if cred.Created != nil {
+			created = cred.Created.Format("2006-01-02 15:04")
+		}
+		result = append(result, credInfo{ID: cred.ID, Label: label, Created: created})
+	}
+	JSONResponse(w, result, http.StatusOK)
+}
+
+// DeleteUserCredential deletes a credential by ID
+func DeleteUserCredential(w http.ResponseWriter, r *http.Request) {
+	sid := r.Header.Get("sid")
+	session, err := GetSession(sid)
+	if err != nil {
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := GetUser(string(session.UserID))
+	if err != nil {
+		JSONResponse(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	credID := r.URL.Query().Get("id")
+	if credID == "" {
+		JSONResponse(w, "Missing credential id", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the credential belongs to this user
+	creds := user.Credentials()
+	found := false
+	for _, cred := range creds {
+		if cred.ID == credID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		JSONResponse(w, "Credential not found", http.StatusNotFound)
+		return
+	}
+
+	user.RemoveCredential([]byte(credID))
+	JSONResponse(w, "Credential deleted", http.StatusOK)
+}
+
+// UpdateProfile updates user name and display name
+func UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	sid := r.Header.Get("sid")
+	session, err := GetSession(sid)
+	if err != nil {
+		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := GetUser(string(session.UserID))
+	if err != nil {
+		JSONResponse(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	user.Name = req.Name
+	user.DisplayName = req.DisplayName
+	if err := SaveUser(user); err != nil {
+		log.Printf("[ERRO] can't update user: %s", err.Error())
+		JSONResponse(w, "Failed to update profile", http.StatusInternalServerError)
+		return
+	}
+
+	JSONResponse(w, user, http.StatusOK)
 }
 
 /////////////////////////////
@@ -236,13 +321,106 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if an existing credential uses the same authenticator (AAGUID).
+	// Platform authenticators (e.g. Touch ID) overwrite the old key pair internally.
+	aaguid := credential.Authenticator.AAGUID
+	newAAGUID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", aaguid[0:4], aaguid[4:6], aaguid[6:8], aaguid[8:10], aaguid[10:16])
+	var duplicateIDs []string
+	for _, existing := range user.Credentials() {
+		if existing.AAGUID != nil && *existing.AAGUID == newAAGUID {
+			duplicateIDs = append(duplicateIDs, existing.ID)
+		}
+	}
+
+	if len(duplicateIDs) > 0 {
+		// Store new credential temporarily in Redis, ask user to confirm replacement
+		confirmToken := uuid.New().String()
+		credJSON, _ := json.Marshal(credential)
+		redisClient.Set(ctx, fmt.Sprintf("passkey_confirm:%s", confirmToken),
+			fmt.Sprintf("%s|%s|%s", user.ID, r.UserAgent(), string(credJSON)),
+			time.Minute*5)
+
+		DeleteSession(registerSid)
+		log.Printf("[INFO] duplicate authenticator detected, awaiting confirmation")
+		JSONResponse(w, map[string]any{
+			"status":        "duplicate",
+			"confirm_token": confirmToken,
+			"message":       "A passkey from the same authenticator already exists. Replace it?",
+		}, http.StatusOK)
+		return
+	}
+
 	user.AddCredential(credential, r.UserAgent())
-	// SaveUser(user)
 	DeleteSession(registerSid)
 	log.Printf("[INFO] finish registration ----------------------/")
-	JSONResponse(w, "Registration Success", http.StatusOK) // Handle next steps
+	JSONResponse(w, map[string]any{"status": "ok", "message": "Registration Success"}, http.StatusOK)
 
 	// SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
+}
+
+///////////////////////////////////
+//                               //
+//    ConfirmRegistration        //
+//                               //
+///////////////////////////////////
+
+func ConfirmRegistration(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[INFO] confirm registration ----------------------\\")
+
+	var req struct {
+		ConfirmToken string `json:"confirm_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSONResponse(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	val, err := redisClient.Get(ctx, fmt.Sprintf("passkey_confirm:%s", req.ConfirmToken)).Result()
+	if err != nil {
+		JSONResponse(w, "Invalid or expired confirmation token", http.StatusBadRequest)
+		return
+	}
+
+	// Parse: userID|userAgent|credentialJSON
+	parts := strings.SplitN(val, "|", 3)
+	if len(parts) != 3 {
+		JSONResponse(w, "Invalid confirmation data", http.StatusBadRequest)
+		return
+	}
+
+	userID, userAgent, credJSON := parts[0], parts[1], parts[2]
+
+	user, err := GetUser(userID)
+	if err != nil {
+		log.Printf("[ERRO] can't get user: %s", err.Error())
+		JSONResponse(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var credential webauthn.Credential
+	if err := json.Unmarshal([]byte(credJSON), &credential); err != nil {
+		log.Printf("[ERRO] can't unmarshal credential: %s", err.Error())
+		JSONResponse(w, "Invalid credential data", http.StatusBadRequest)
+		return
+	}
+
+	// Remove old credentials with the same AAGUID
+	aaguid := credential.Authenticator.AAGUID
+	newAAGUID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", aaguid[0:4], aaguid[4:6], aaguid[6:8], aaguid[8:10], aaguid[10:16])
+	for _, existing := range user.Credentials() {
+		if existing.AAGUID != nil && *existing.AAGUID == newAAGUID {
+			user.RemoveCredential([]byte(existing.ID))
+			log.Printf("[INFO] removed old credential %s (same authenticator)", existing.ID)
+		}
+	}
+
+	user.AddCredential(&credential, userAgent)
+
+	// Clean up confirmation token
+	redisClient.Del(ctx, fmt.Sprintf("passkey_confirm:%s", req.ConfirmToken))
+
+	log.Printf("[INFO] confirm registration ----------------------/")
+	JSONResponse(w, map[string]any{"status": "ok", "message": "Passkey replaced"}, http.StatusOK)
 }
 
 //////////////////////
