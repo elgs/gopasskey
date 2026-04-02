@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-ui-theme="nord">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +8,17 @@
   <link rel="stylesheet" href="web.css">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/az-code-lab/ui/src/icons.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/az-code-lab/ui/src/ui.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/az-code-lab/ui/src/themes/nord.css">
+  <script>
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    function applySystem() {
+      document.documentElement.setAttribute('data-theme', mq.matches ? 'dark' : '');
+    }
+    applySystem();
+    mq.addEventListener('change', applySystem);
+  </script>
 </head>
 <body style="opacity: 0;" onload="document.body.style.opacity=1">
   <web-root></web-root>

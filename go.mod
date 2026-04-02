@@ -7,7 +7,7 @@ go 1.26.1
 require (
 	github.com/elgs/gosqlcrud v0.0.0-20260313074803-222d25e4d91c
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/go-webauthn/webauthn v0.16.1
+	github.com/go-webauthn/webauthn v0.16.2
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.18.0
 )
@@ -21,6 +21,8 @@ require (
 	github.com/go-webauthn/x v0.2.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
+	github.com/philhofer/fwd v1.2.0 // indirect
+	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
