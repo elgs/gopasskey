@@ -65,7 +65,7 @@
               <img lw-if="aaguidIcon(cred.aaguid)" lw-bind:src="aaguidIcon(cred.aaguid)" class="aaguid-icon">
               <span lw>aaguidName(cred.aaguid)</span>
             </td>
-            <td lw>cred.label || 'Unnamed'</td>
+            <td lw>parseUserAgent(cred.label)</td>
             <td lw>cred.created</td>
             <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button></td>
           </tr>

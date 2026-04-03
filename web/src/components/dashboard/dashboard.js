@@ -37,6 +37,26 @@ customElements.define('web-dashboard',
       await this.loadUserData();
     }
 
+    parseUserAgent(ua) {
+      if (!ua) return 'Unknown';
+      let os = 'Unknown';
+      if (ua.includes('Macintosh')) os = 'macOS';
+      else if (ua.includes('Windows')) os = 'Windows';
+      else if (ua.includes('Android')) os = 'Android';
+      else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+      else if (ua.includes('CrOS')) os = 'ChromeOS';
+      else if (ua.includes('Linux')) os = 'Linux';
+
+      let browser = 'Unknown';
+      if (ua.includes('Edg/')) browser = 'Edge';
+      else if (ua.includes('OPR/') || ua.includes('Opera')) browser = 'Opera';
+      else if (ua.includes('Chrome/')) browser = 'Chrome';
+      else if (ua.includes('Safari/')) browser = 'Safari';
+      else if (ua.includes('Firefox/')) browser = 'Firefox';
+
+      return browser + ' on ' + os;
+    }
+
     aaguidName(aaguid) {
       return this.aaguids[aaguid]?.name || aaguid || '';
     }
