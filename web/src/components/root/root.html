@@ -1,1 +1,2 @@
-
+<web-login lw-if="!loggedIn" lw-on:login="onLogin()"></web-login>
+<web-dashboard lw-if="loggedIn" lw-on:logout="onLogout()"></web-dashboard>
