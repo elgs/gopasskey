@@ -1,33 +1,105 @@
 :host {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
+  display: block;
 
-  .dashboard-panel {
-    max-width: 420px;
-    width: 100%;
+  .dashboard {
+    display: flex;
+    min-height: 100vh;
+    font-family: var(--ui-font);
+    font-size: var(--ui-font-size);
   }
 
-  .credential-row {
+  .sidebar {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--ui-border);
+    padding: 0.75rem;
+  }
+
+  .sidebar-header {
+    font-weight: 700;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--ui-text);
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--ui-border);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .user-email {
+    color: var(--ui-text-muted);
+    padding: 0 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--ui-radius);
+    cursor: pointer;
+    color: var(--ui-text-muted);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--ui-text);
+      background: color-mix(in srgb, var(--ui-text) 8%, transparent);
+    }
+
+    &.active {
+      color: var(--ui-text);
+      background: color-mix(in srgb, var(--ui-text) 8%, transparent);
+    }
+  }
+
+  .content {
+    flex: 1;
+    padding: 1.5rem 2rem;
+  }
+
+  .page-header {
+    display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 1rem;
   }
 
-  .credential-info {
-    flex: 1;
-    min-width: 0;
+  .page-title {
+    margin: 0;
+    font-size: 1.1em;
+    color: var(--ui-text);
+    font-weight: 600;
+  }
 
-    .credential-label {
-      font-size: 0.85em;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  .authenticator-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 
-    .credential-date {
-      font-size: 0.75em;
-      opacity: 0.6;
-    }
+  .aaguid-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+  }
+
+  .action-cell {
+    text-align: right;
   }
 }

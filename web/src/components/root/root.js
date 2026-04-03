@@ -11,6 +11,7 @@ customElements.define('web-root',
 
     onLogin() {
       this.loggedIn = true;
+      this.querySelector('web-dashboard')?.loadUserData();
     }
 
     onLogout() {

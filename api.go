@@ -28,11 +28,16 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 	creds := user.Credentials()
 	type credInfo struct {
 		ID      string `json:"id"`
+		AAGUID  string `json:"aaguid"`
 		Label   string `json:"label"`
 		Created string `json:"created"`
 	}
 	var result []credInfo
 	for _, cred := range creds {
+		aaguid := ""
+		if cred.AAGUID != nil {
+			aaguid = *cred.AAGUID
+		}
 		label := ""
 		if cred.Label != nil {
 			label = *cred.Label
@@ -41,7 +46,7 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 		if cred.Created != nil {
 			created = cred.Created.Format("2006-01-02 15:04")
 		}
-		result = append(result, credInfo{ID: cred.ID, Label: label, Created: created})
+		result = append(result, credInfo{ID: cred.ID, AAGUID: aaguid, Label: label, Created: created})
 	}
 	JSONResponse(w, result, http.StatusOK)
 }

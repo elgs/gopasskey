@@ -1,17 +1,31 @@
-<div class="ui-panel raised dashboard-panel">
-  <div class="ui-panel-header">
-    <h2 class="ui-panel-title">GoPasskey</h2>
-    <div class="ui-panel-actions">
-      <button class="ui-btn outline danger sm" lw-class:loading="logoutLoading" lw-on:click="logout()">Logout</button>
+<div class="dashboard">
+  <nav class="sidebar">
+    <div class="sidebar-header">GoPasskey</div>
+    <div class="sidebar-nav">
+      <a class="nav-item" lw-class:active="page === 'profile'" lw-on:click="navigate('profile')" href="#profile">
+        <i class="ui-icon ui-icon-user"></i>
+        <span>Profile</span>
+      </a>
+      <a class="nav-item" lw-class:active="page === 'passkeys'" lw-on:click="navigate('passkeys')" href="#passkeys">
+        <i class="ui-icon ui-icon-passkey"></i>
+        <span>Passkeys</span>
+      </a>
     </div>
-  </div>
+    <div class="sidebar-footer">
+      <div lw class="user-email">email</div>
+      <a class="nav-item" lw-on:click="logout()">
+        <i class="ui-icon ui-icon-log-out"></i>
+        <span>Logout</span>
+      </a>
+    </div>
+  </nav>
 
-  <div class="ui-panel-body">
-    <div class="ui-stack">
+  <main class="content">
+    <div lw lw-if="message" class="ui-alert sm">message</div>
 
-      <div lw lw-if="message" class="ui-alert">message</div>
-
-      <!-- Profile -->
+    <!-- Profile -->
+    <div lw-if="page === 'profile'" class="page">
+      <h3 class="page-title">Profile</h3>
       <div class="ui-stack sm">
         <div class="ui-field">
           <label class="ui-label">Email</label>
@@ -25,25 +39,40 @@
           <label class="ui-label">Display Name</label>
           <input class="ui-input" type="text" placeholder="Display Name" lw-model="userDisplayName">
         </div>
-        <button class="ui-btn block" lw-class:loading="profileLoading" lw-on:click="saveProfile()">Save Profile</button>
+        <button class="ui-btn sm" lw-class:loading="profileLoading" lw-on:click="saveProfile()">Save</button>
       </div>
-
-      <!-- Passkeys -->
-      <div class="ui-stack sm">
-        <label class="ui-label">Passkeys</label>
-        <div lw-if="credentials.length === 0" class="ui-text secondary">No passkeys registered.</div>
-        <div lw-for="cred in credentials" class="ui-row sm credential-row">
-          <div class="credential-info">
-            <div lw class="credential-label">cred.label || 'Unnamed'</div>
-            <div lw class="credential-date">cred.created</div>
-          </div>
-          <button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button>
-        </div>
-        <button class="ui-btn success block" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
-      </div>
-
     </div>
-  </div>
+
+    <!-- Passkeys -->
+    <div lw-if="page === 'passkeys'" class="page">
+      <div class="page-header">
+        <h3 class="page-title">Passkeys</h3>
+        <button class="ui-btn success sm" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
+      </div>
+      <div lw-if="credentials.length === 0" class="ui-text secondary">No passkeys registered.</div>
+      <table lw-if="credentials.length > 0" class="ui-table">
+        <thead>
+          <tr>
+            <th>Authenticator</th>
+            <th>Label</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr lw-for="cred in credentials">
+            <td class="authenticator-cell">
+              <img lw-if="aaguidIcon(cred.aaguid)" lw-bind:src="aaguidIcon(cred.aaguid)" class="aaguid-icon">
+              <span lw>aaguidName(cred.aaguid)</span>
+            </td>
+            <td lw>cred.label || 'Unnamed'</td>
+            <td lw>cred.created</td>
+            <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
 </div>
 
 <!-- Confirmation dialog -->

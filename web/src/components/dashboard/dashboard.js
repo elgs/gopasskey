@@ -8,6 +8,7 @@ customElements.define('web-dashboard',
       super(ast);
     }
 
+    page = location.hash.slice(1) || 'profile';
     email = '';
     userName = '';
     userDisplayName = '';
@@ -22,11 +23,33 @@ customElements.define('web-dashboard',
     confirmDanger = false;
     _confirmResolve = null;
 
-    async domReady() {
-      await this.checkSession();
+    navigate(page) {
+      this.page = page;
     }
 
-    async checkSession() {
+    aaguids = {};
+
+    async domReady() {
+      fetch('resources/aaguids.json').then(r => r.json()).then(data => {
+        this.aaguids = data;
+        this.update();
+      });
+      await this.loadUserData();
+    }
+
+    aaguidName(aaguid) {
+      return this.aaguids[aaguid]?.name || aaguid || '';
+    }
+
+    aaguidIcon(aaguid) {
+      const info = this.aaguids[aaguid];
+      if (!aaguid || !info || !info.icon_ext) return '';
+      const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const suffix = dark ? '_dark' : '';
+      return 'resources/aaguid_icons/' + aaguid + suffix + '.' + info.icon_ext;
+    }
+
+    async loadUserData() {
       try {
         const sid = localStorage.getItem('sid');
         if (!sid) return;
@@ -41,16 +64,16 @@ customElements.define('web-dashboard',
           this.email = user.email;
           this.userName = user.name || '';
           this.userDisplayName = user.display_name || '';
-          this.message = `Logged in as ${user.email}`;
-          await this.loadCredentials();
         } else {
           localStorage.removeItem('sid');
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
+          return;
         }
       } catch (error) {
-        localStorage.removeItem('sid');
-        this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
+        // Network error during refresh — don't log out, keep current session
+        return;
       }
+      await this.loadCredentials();
     }
 
     async loadCredentials() {
@@ -65,6 +88,7 @@ customElements.define('web-dashboard',
         if (response.ok) {
           const data = await response.json();
           this.credentials = data || [];
+          this.update();
         }
       } catch (error) {
         // silently fail
