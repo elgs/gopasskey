@@ -1,0 +1,33 @@
+:host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+
+  .dashboard-panel {
+    max-width: 420px;
+    width: 100%;
+  }
+
+  .credential-row {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .credential-info {
+    flex: 1;
+    min-width: 0;
+
+    .credential-label {
+      font-size: 0.85em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .credential-date {
+      font-size: 0.75em;
+      opacity: 0.6;
+    }
+  }
+}

@@ -1,0 +1,28 @@
+<div class="ui-panel raised login-panel">
+  <div class="ui-panel-header">
+    <h2 class="ui-panel-title">GoPasskey</h2>
+  </div>
+
+  <div class="ui-panel-body">
+    <div class="ui-stack">
+
+      <div lw lw-if="message" class="ui-alert">message</div>
+
+      <div class="ui-stack sm">
+        <div class="ui-field">
+          <label class="ui-label">Email</label>
+          <input class="ui-input" type="email" placeholder="you@example.com" lw-model="email" name="email" lw-on:keydown="onEmailKeydown($event)" autofocus>
+        </div>
+        <label class="ui-checkbox">
+          <input type="checkbox" lw-model="rememberMe" lw-on:change="onRememberMeChange()">
+          <span>Remember me</span>
+        </label>
+        <div class="ui-row sm">
+          <button class="ui-btn block" lw-class:loading="emailLoading" lw-on:click="loginWithEmail()">Login with Email</button>
+          <button class="ui-btn outline success block" lw-class:loading="passkeyLoading" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
