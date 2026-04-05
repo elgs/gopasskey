@@ -7,7 +7,7 @@ customElements.define('web-root',
       super(ast);
     }
 
-    loggedIn = !!localStorage.getItem('sid');
+    loggedIn = document.cookie.includes('logged_in=');
 
     onLogin() {
       this.loggedIn = true;

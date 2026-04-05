@@ -23,19 +23,39 @@ customElements.define('web-login',
         this.rememberMe = true;
       }
 
+      // Store SSO params if present in URL
       const urlParams = new URLSearchParams(window.location.search);
-      const sid = urlParams.get('sid');
-      if (sid) {
-        localStorage.setItem('sid', sid);
-        window.history.replaceState({}, document.title, '/');
-        this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
-        return;
+      if (urlParams.get('sso_client_id')) {
+        sessionStorage.setItem('sso_client_id', urlParams.get('sso_client_id'));
+        sessionStorage.setItem('sso_redirect_uri', urlParams.get('sso_redirect_uri') || '');
+        sessionStorage.setItem('sso_state', urlParams.get('sso_state') || '');
       }
 
-      const storedSid = localStorage.getItem('sid');
-      if (storedSid) {
+      // Check if user is logged in (cookie set by server)
+      if (document.cookie.includes('logged_in=')) {
+        if (this._handleSSORedirect()) return;
         this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
       }
+    }
+
+    _handleSSORedirect() {
+      const clientId = sessionStorage.getItem('sso_client_id');
+      if (!clientId) return false;
+
+      const redirectUri = sessionStorage.getItem('sso_redirect_uri') || '';
+      const state = sessionStorage.getItem('sso_state') || '';
+
+      sessionStorage.removeItem('sso_client_id');
+      sessionStorage.removeItem('sso_redirect_uri');
+      sessionStorage.removeItem('sso_state');
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        state: state,
+      });
+      window.location.href = `/api/pub/sso/authorize?${params.toString()}`;
+      return true;
     }
 
     onRememberMeChange() {
@@ -135,14 +155,10 @@ customElements.define('web-login',
           body: JSON.stringify(assertionResponse)
         });
 
-        const sid = verificationResponse.headers.get('sid');
-        if (sid) {
-          localStorage.setItem('sid', sid);
-        }
-
         const msg = await verificationResponse.json();
         if (verificationResponse.ok) {
           this.saveEmailIfRemembered();
+          if (this._handleSSORedirect()) return;
           this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
         } else {
           this.setMessage(msg, 'danger');

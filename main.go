@@ -45,6 +45,7 @@ func main() {
 	initDB()
 	defer db.Close()
 	initPasskeyStore()
+	initSSOClients()
 	initApiServer()
 }
 
@@ -73,11 +74,19 @@ func initApiServer() {
 	mux.HandleFunc("POST /api/pub/passkey_login_start", BeginLogin)
 	mux.HandleFunc("POST /api/pub/passkey_login_finish", FinishLogin)
 
+	mux.HandleFunc("GET /api/pub/sso/authorize", SSOAuthorize)
+	mux.HandleFunc("POST /api/pub/sso/token", SSOToken)
+	mux.HandleFunc("GET /api/pub/sso/validate", SSOValidate)
+	mux.HandleFunc("POST /api/pub/sso/revoke", SSORevoke)
+	mux.HandleFunc("GET /api/pub/sso/logout", SSOLogout)
+
 	mux.HandleFunc("POST /api/logout", Logout)
 	mux.HandleFunc("GET /api/credentials", GetUserCredentials)
 	mux.HandleFunc("DELETE /api/credentials", DeleteUserCredential)
 	mux.HandleFunc("PUT /api/profile", UpdateProfile)
 	mux.HandleFunc("GET /api/me", Me)
+	mux.HandleFunc("GET /api/sso/sessions", SSOSessions)
+	mux.HandleFunc("DELETE /api/sso/sessions", SSORevokeSession)
 
 	handler := CORS(Auth(mux))
 	addr := fmt.Sprintf("%s:%s", host, port)

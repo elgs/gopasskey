@@ -10,6 +10,10 @@
         <i class="ui-icon ui-icon-passkey"></i>
         <span>Passkeys</span>
       </a>
+      <a class="ui-menu-item" lw-class:active="page === 'sessions'" lw-on:click="navigate('sessions')" href="#sessions">
+        <i class="ui-icon ui-icon-monitor"></i>
+        <span>Sessions</span>
+      </a>
     </div>
     <div class="ui-menu borderless">
       <hr class="ui-menu-divider">
@@ -86,6 +90,37 @@
             <td lw>parseUserAgent(cred.label)</td>
             <td lw>cred.created</td>
             <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Sessions -->
+    <div lw-if="page === 'sessions'" class="ui-panel flat">
+      <div class="ui-panel-header">
+        <h3 class="ui-panel-title">Client Sessions</h3>
+      </div>
+      <div lw-if="sessionsLoaded && ssoSessions.length === 0" class="ui-panel-body">
+        <div class="ui-empty sm">
+          <div class="ui-empty-icon"><i class="ui-icon ui-icon-monitor"></i></div>
+          <p class="ui-empty-description">No active client sessions.</p>
+        </div>
+      </div>
+      <table lw-if="ssoSessions.length > 0" class="ui-table borderless">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>URL</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr lw-for="s in ssoSessions">
+            <td lw>s.client_id</td>
+            <td><a lw lw-bind:href="s.url + '/sso/impersonate?token=' + s.token" target="_blank">s.url + '/sso/impersonate?token=' + s.token</a></td>
+            <td lw>s.created</td>
+            <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="revokeSession(s.token)">Kick Out</button></td>
           </tr>
         </tbody>
       </table>

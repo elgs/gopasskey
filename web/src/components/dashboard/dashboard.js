@@ -14,6 +14,8 @@ customElements.define('web-dashboard',
     userDisplayName = '';
     credentials = [];
     credentialsLoaded = false;
+    ssoSessions = [];
+    sessionsLoaded = false;
     logoutLoading = false;
     profileLoading = false;
     registerLoading = false;
@@ -25,6 +27,9 @@ customElements.define('web-dashboard',
 
     navigate(page) {
       this.page = page;
+      if (page === 'sessions') {
+        this.loadSSOSessions();
+      }
     }
 
     showToast(text, type = 'success', duration = 3000) {
@@ -57,6 +62,8 @@ customElements.define('web-dashboard',
 
     aaguids = {};
 
+    dataLoaded = false;
+
     async domReady() {
       const savedWidth = localStorage.getItem('sidebar-width');
       if (savedWidth) this.querySelector('.sidebar').style.width = savedWidth;
@@ -66,6 +73,9 @@ customElements.define('web-dashboard',
         this.update();
       });
       await this.loadUserData();
+      if (this.page === 'sessions') {
+        this.loadSSOSessions();
+      }
     }
 
     parseUserAgent(ua) {
@@ -101,14 +111,10 @@ customElements.define('web-dashboard',
     }
 
     async loadUserData() {
+      if (this.dataLoaded) return;
+      this.dataLoaded = true;
       try {
-        const sid = localStorage.getItem('sid');
-        if (!sid) return;
-
-        const response = await fetch(`${env.apiUrl}me`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
-        });
+        const response = await fetch(`${env.apiUrl}me`);
 
         if (response.ok) {
           const user = await response.json();
@@ -116,7 +122,6 @@ customElements.define('web-dashboard',
           this.userName = user.name || '';
           this.userDisplayName = user.display_name || '';
         } else {
-          localStorage.removeItem('sid');
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
           return;
         }
@@ -129,12 +134,7 @@ customElements.define('web-dashboard',
 
     async loadCredentials() {
       try {
-        const sid = localStorage.getItem('sid');
-        if (!sid) return;
-
-        const response = await fetch(`${env.apiUrl}credentials`, {
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
-        });
+        const response = await fetch(`${env.apiUrl}credentials`);
 
         if (response.ok) {
           const data = await response.json();
@@ -175,10 +175,9 @@ customElements.define('web-dashboard',
       this.profileLoading = true;
       this.update();
       try {
-        const sid = localStorage.getItem('sid');
         const response = await fetch(`${env.apiUrl}profile`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', 'sid': sid },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: this.userName, display_name: this.userDisplayName })
         });
 
@@ -207,10 +206,8 @@ customElements.define('web-dashboard',
       if (!confirmed) return;
 
       try {
-        const sid = localStorage.getItem('sid');
         const response = await fetch(`${env.apiUrl}credentials?id=${encodeURIComponent(credId)}`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
         });
 
         const msg = await response.json();
@@ -226,12 +223,6 @@ customElements.define('web-dashboard',
     }
 
     async registerPasskey() {
-      const sid = localStorage.getItem('sid');
-      if (!sid) {
-        this.showToast('Not logged in', 'danger');
-        return;
-      }
-
       this.registerLoading = true;
       this.update();
       try {
@@ -293,19 +284,60 @@ customElements.define('web-dashboard',
       }
     }
 
-    async logout() {
-      this.logoutLoading = true;
+    async loadSSOSessions() {
+      this.ssoSessions = [];
+      this.sessionsLoaded = false;
       this.update();
       try {
-        const sid = localStorage.getItem('sid');
-        const response = await fetch(`${env.apiUrl}logout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'sid': sid }
+        const response = await fetch(`${env.apiUrl}sso/sessions`);
+
+        if (response.ok) {
+          const data = await response.json();
+          this.ssoSessions = data || [];
+          this.sessionsLoaded = true;
+          this.update();
+        }
+      } catch (error) {
+        // silently fail
+      }
+    }
+
+    async revokeSession(token) {
+      const confirmed = await this.showConfirm({
+        title: 'Kick Out Session',
+        message: 'Are you sure you want to revoke this session? The client will be logged out immediately.',
+        action: 'Kick Out',
+        danger: true,
+      });
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(`${env.apiUrl}sso/sessions?token=${encodeURIComponent(token)}`, {
+          method: 'DELETE',
         });
 
         const msg = await response.json();
         if (response.ok) {
-          localStorage.removeItem('sid');
+          this.showToast(msg);
+          await this.loadSSOSessions();
+        } else {
+          this.showToast(msg, 'danger');
+        }
+      } catch (error) {
+        this.showToast(error.message, 'danger');
+      }
+    }
+
+    async logout() {
+      this.logoutLoading = true;
+      this.update();
+      try {
+        const response = await fetch(`${env.apiUrl}logout`, {
+          method: 'POST',
+        });
+
+        const msg = await response.json();
+        if (response.ok) {
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
         } else {
           this.showToast(msg, 'danger');

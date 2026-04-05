@@ -14,7 +14,7 @@ import (
 
 // GetUserCredentials returns credentials for a user
 func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("sid")
+	sid := getSessionID(r)
 	session, err := GetSession(sid)
 	if err != nil {
 		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
@@ -53,7 +53,7 @@ func GetUserCredentials(w http.ResponseWriter, r *http.Request) {
 
 // DeleteUserCredential deletes a credential by ID
 func DeleteUserCredential(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("sid")
+	sid := getSessionID(r)
 	session, err := GetSession(sid)
 	if err != nil {
 		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
@@ -91,7 +91,7 @@ func DeleteUserCredential(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProfile updates user name and display name
 func UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("sid")
+	sid := getSessionID(r)
 	session, err := GetSession(sid)
 	if err != nil {
 		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
@@ -237,8 +237,8 @@ func VerifyLoginLink(w http.ResponseWriter, r *http.Request) {
 		Expires: time.Now().Add(time.Hour),
 	}, time.Hour)
 
-	// Redirect to frontend with session ID
-	http.Redirect(w, r, fmt.Sprintf("/?sid=%s", sessionID), http.StatusFound)
+	setSessionCookies(w, sessionID, time.Hour)
+	http.Redirect(w, r, "/", http.StatusFound)
 
 	log.Printf("[INFO] verify login link ----------------------/")
 }
@@ -530,7 +530,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 		UserID:  user.WebAuthnID(),
 		Expires: time.Now().Add(time.Hour),
 	}, time.Hour) // save session for 1 hour
-	w.Header().Set("sid", sessionID)
+	setSessionCookies(w, sessionID, time.Hour)
 	/////////////////////////////////////////////////////////////////
 
 	log.Printf("[INFO] finish login ----------------------/")
@@ -544,7 +544,7 @@ func FinishLogin(w http.ResponseWriter, r *http.Request) {
 //////////////////
 
 func Logout(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("sid")
+	sid := getSessionID(r)
 	if sid == "" {
 		log.Printf("[ERRO] can't get session id")
 		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
@@ -553,6 +553,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("Logging out session", sid)
 	DeleteSession(sid)
+	clearSessionCookies(w)
 	JSONResponse(w, "Logout Success", http.StatusOK)
 }
 
@@ -581,7 +582,7 @@ func Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		sid := r.Header.Get("sid")
+		sid := getSessionID(r)
 		if sid == "" {
 			JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
 			log.Println("[ERRO] can't get session id")
@@ -605,6 +606,37 @@ func Auth(next http.Handler) http.Handler {
 	})
 }
 
+func getSessionID(r *http.Request) string {
+	cookie, err := r.Cookie("sid")
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
+}
+
+func setSessionCookies(w http.ResponseWriter, sid string, ttl time.Duration) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "sid",
+		Value:    sid,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(ttl.Seconds()),
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "logged_in",
+		Value:    "1",
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   int(ttl.Seconds()),
+	})
+}
+
+func clearSessionCookies(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{Name: "sid", MaxAge: -1, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "logged_in", MaxAge: -1, Path: "/"})
+}
+
 // JSONResponse is a helper function to send json response
 func JSONResponse(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
@@ -625,7 +657,6 @@ func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Access-Control-Allow-Origin", "*")
 		w.Header().Add("Access-Control-Allow-Headers", "*")
-		w.Header().Add("Access-Control-Expose-Headers", "sid")
 
 		if r.Method == "OPTIONS" {
 			w.Header().Set("Allow", "GET,POST,PUT,PATCH,DELETE,OPTIONS")
@@ -643,7 +674,7 @@ func CORS(next http.Handler) http.Handler {
 //////////////
 
 func Me(w http.ResponseWriter, r *http.Request) {
-	sid := r.Header.Get("sid")
+	sid := getSessionID(r)
 	if sid == "" {
 		log.Printf("[ERRO] can't get session id")
 		JSONResponse(w, "Unauthorized", http.StatusUnauthorized)
