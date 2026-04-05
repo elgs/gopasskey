@@ -67,9 +67,8 @@ func initApiServer() {
 
 	mux.HandleFunc("POST /api/pub/login_start", BeginEmailLogin)
 	mux.HandleFunc("GET /api/pub/verify_login", VerifyLoginLink)
-	mux.HandleFunc("POST /api/pub/register_start", BeginRegistration)
-	mux.HandleFunc("POST /api/pub/register_finish", FinishRegistration)
-	mux.HandleFunc("POST /api/pub/register_confirm", ConfirmRegistration)
+	mux.HandleFunc("POST /api/pub/passkey_register_start", BeginRegistration)
+	mux.HandleFunc("POST /api/pub/passkey_register_finish", FinishRegistration)
 	mux.HandleFunc("POST /api/pub/passkey_login_start", BeginLogin)
 	mux.HandleFunc("POST /api/pub/passkey_login_finish", FinishLogin)
 

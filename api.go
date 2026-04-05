@@ -338,20 +338,9 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(duplicateIDs) > 0 {
-		// Store new credential temporarily in Redis, ask user to confirm replacement
-		confirmToken := uuid.New().String()
-		credJSON, _ := json.Marshal(credential)
-		redisClient.Set(ctx, fmt.Sprintf("passkey_confirm:%s", confirmToken),
-			fmt.Sprintf("%s|%s|%s", user.ID, r.UserAgent(), string(credJSON)),
-			time.Minute*5)
-
 		DeleteSession(registerSid)
-		log.Printf("[INFO] duplicate authenticator detected, awaiting confirmation")
-		JSONResponse(w, map[string]any{
-			"status":        "duplicate",
-			"confirm_token": confirmToken,
-			"message":       "A passkey from the same authenticator already exists. Replace it?",
-		}, http.StatusOK)
+		log.Printf("[INFO] duplicate authenticator detected, rejecting registration")
+		JSONResponse(w, "A passkey from this authenticator is already registered. Delete the existing passkey first.", http.StatusBadRequest)
 		return
 	}
 
@@ -361,71 +350,6 @@ func FinishRegistration(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, map[string]any{"status": "ok", "message": "Registration Success"}, http.StatusOK)
 
 	// SendMail(user.WebAuthnEmail(), "Welcome to Go Passkey", "Thank you for registering with Go Passkey!")
-}
-
-///////////////////////////////////
-//                               //
-//    ConfirmRegistration        //
-//                               //
-///////////////////////////////////
-
-func ConfirmRegistration(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[INFO] confirm registration ----------------------\\")
-
-	var req struct {
-		ConfirmToken string `json:"confirm_token"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		JSONResponse(w, "Invalid request", http.StatusBadRequest)
-		return
-	}
-
-	val, err := redisClient.Get(ctx, fmt.Sprintf("passkey_confirm:%s", req.ConfirmToken)).Result()
-	if err != nil {
-		JSONResponse(w, "Invalid or expired confirmation token", http.StatusBadRequest)
-		return
-	}
-
-	// Parse: userID|userAgent|credentialJSON
-	parts := strings.SplitN(val, "|", 3)
-	if len(parts) != 3 {
-		JSONResponse(w, "Invalid confirmation data", http.StatusBadRequest)
-		return
-	}
-
-	userID, userAgent, credJSON := parts[0], parts[1], parts[2]
-
-	user, err := GetUser(userID)
-	if err != nil {
-		log.Printf("[ERRO] can't get user: %s", err.Error())
-		JSONResponse(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	var credential webauthn.Credential
-	if err := json.Unmarshal([]byte(credJSON), &credential); err != nil {
-		log.Printf("[ERRO] can't unmarshal credential: %s", err.Error())
-		JSONResponse(w, "Invalid credential data", http.StatusBadRequest)
-		return
-	}
-
-	// Remove old credentials with the same AAGUID
-	aaguid := credential.Authenticator.AAGUID
-	newAAGUID := fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", aaguid[0:4], aaguid[4:6], aaguid[6:8], aaguid[8:10], aaguid[10:16])
-	for _, existing := range user.Credentials() {
-		if existing.AAGUID != nil && *existing.AAGUID == newAAGUID {
-			user.RemoveCredential([]byte(existing.ID))
-			log.Printf("[INFO] removed old credential %s (same authenticator)", existing.ID)
-		}
-	}
-
-	user.AddCredential(&credential, userAgent)
-
-	// Clean up confirmation token
-	redisClient.Del(ctx, fmt.Sprintf("passkey_confirm:%s", req.ConfirmToken))
-
-	log.Printf("[INFO] confirm registration ----------------------/")
-	JSONResponse(w, map[string]any{"status": "ok", "message": "Passkey replaced"}, http.StatusOK)
 }
 
 //////////////////////

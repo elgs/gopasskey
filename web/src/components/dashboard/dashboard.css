@@ -79,4 +79,15 @@
     text-align: right;
   }
 
+  .ui-table a {
+    color: var(--ui-text-muted, #888);
+    text-decoration: none;
+    word-break: break-all;
+
+    &:hover {
+      color: var(--ui-primary);
+      text-decoration: underline;
+    }
+  }
+
 }

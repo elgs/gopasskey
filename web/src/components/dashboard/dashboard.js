@@ -245,7 +245,7 @@ customElements.define('web-dashboard',
       this.registerLoading = true;
       this.update();
       try {
-        const response = await fetch(`${env.pubApiUrl}register_start`, {
+        const response = await fetch(`${env.pubApiUrl}passkey_register_start`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: this.email })
@@ -264,7 +264,7 @@ customElements.define('web-dashboard',
         const options = await response.json();
 
         const attestationResponse = await SimpleWebAuthnBrowser.startRegistration({ optionsJSON: options.publicKey });
-        const verificationResponse = await fetch(`${env.pubApiUrl}register_finish`, {
+        const verificationResponse = await fetch(`${env.pubApiUrl}passkey_register_finish`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'register_sid': registerSid },
           body: JSON.stringify(attestationResponse)
@@ -273,25 +273,6 @@ customElements.define('web-dashboard',
         const result = await verificationResponse.json();
         if (!verificationResponse.ok) {
           this.showToast(result, 'danger');
-        } else if (result.status === 'duplicate') {
-          const confirmed = await this.showConfirm({
-            title: 'Replace Passkey',
-            message: result.message,
-            action: 'Replace',
-            danger: true,
-          });
-          if (confirmed) {
-            const confirmResponse = await fetch(`${env.pubApiUrl}register_confirm`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ confirm_token: result.confirm_token })
-            });
-            const confirmResult = await confirmResponse.json();
-            this.showToast(confirmResult.message || confirmResult);
-          } else {
-            this.showToast('Registration cancelled', 'warning');
-          }
-          await this.loadCredentials();
         } else {
           this.showToast(result.message || result);
           await this.loadCredentials();

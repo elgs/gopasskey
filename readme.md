@@ -115,7 +115,6 @@ INSERT INTO sso_client (id, client_secret, redirect_uri, name) VALUES
 | Key | Type | TTL | Value | Used For |
 |---|---|---|---|---|
 | `passkey_session:{id}` | String | 5 min or 1 hour | JSON session data | WebAuthn handshake (5 min) or logged-in session (1 hour) |
-| `passkey_confirm:{token}` | String | 5 min | userID\|userAgent\|credential | Confirming passkey replacement |
 | `sso_code:{code}` | String | 5 min | userID\|sessionID | One-time auth code for SSO |
 | `sso_token:{token}` | String | 1 hour (sliding) | JSON token metadata | Opaque SSO token for client apps |
 | `sso_user_tokens:{userID}` | Set | none | Set of token strings | Index of all SSO tokens per user |
@@ -139,9 +138,8 @@ The SSO server sets two cookies on its own domain:
 | GET | `/api/pub/verify_login` | Verify magic link token |
 | POST | `/api/pub/passkey_login_start` | Start passkey login |
 | POST | `/api/pub/passkey_login_finish` | Complete passkey login |
-| POST | `/api/pub/register_start` | Start passkey registration |
-| POST | `/api/pub/register_finish` | Complete passkey registration |
-| POST | `/api/pub/register_confirm` | Confirm passkey replacement |
+| POST | `/api/pub/passkey_register_start` | Start passkey registration |
+| POST | `/api/pub/passkey_register_finish` | Complete passkey registration |
 
 ### SSO (called by client apps)
 
