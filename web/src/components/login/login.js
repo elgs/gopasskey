@@ -31,11 +31,17 @@ customElements.define('web-login',
         sessionStorage.setItem('sso_state', urlParams.get('sso_state') || '');
       }
 
-      // Check if user is logged in (cookie set by server)
-      if (document.cookie.includes('sso_logged_in=')) {
-        if (this._handleSSORedirect()) return;
-        this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
-      }
+      // Check if user has a valid session
+      try {
+        const resp = await fetch(`${env.apiUrl}me`);
+        if (resp.ok) {
+          if (this._handleSSORedirect()) return;
+          this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
+          return;
+        }
+      } catch (e) {}
+      // Session invalid — clear stale cookie
+      document.cookie = 'sso_logged_in=; Max-Age=0; Path=/';
     }
 
     _handleSSORedirect() {

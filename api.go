@@ -633,8 +633,8 @@ func setSessionCookies(w http.ResponseWriter, sid string, ttl time.Duration) {
 }
 
 func clearSessionCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: "sso_session", MaxAge: -1, Path: "/"})
-	http.SetCookie(w, &http.Cookie{Name: "sso_logged_in", MaxAge: -1, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "sso_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "sso_logged_in", Value: "", Path: "/", SameSite: http.SameSiteLaxMode, MaxAge: -1})
 }
 
 // JSONResponse is a helper function to send json response

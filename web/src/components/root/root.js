@@ -7,7 +7,7 @@ customElements.define('web-root',
       super(ast);
     }
 
-    loggedIn = document.cookie.includes('sso_logged_in=');
+    loggedIn = false;
 
     onLogin() {
       this.loggedIn = true;

@@ -122,6 +122,7 @@ customElements.define('web-dashboard',
           this.userName = user.name || '';
           this.userDisplayName = user.display_name || '';
         } else {
+          document.cookie = 'sso_logged_in=; Max-Age=0; Path=/';
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
           return;
         }

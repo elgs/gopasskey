@@ -24,6 +24,7 @@ type SSOClient struct {
 type SSOTokenData struct {
 	UserID    string `json:"user_id"`
 	ClientID  string `json:"client_id"`
+	SessionID string `json:"session_id"`
 	UserAgent string `json:"user_agent"`
 	Created   string `json:"created"`
 }
@@ -84,13 +85,17 @@ func SSOAuthorize(w http.ResponseWriter, r *http.Request) {
 		if err == nil && !session.Expires.Before(time.Now()) {
 			code := generateCode()
 			userID := string(session.UserID)
-			redisClient.Set(ctx, fmt.Sprintf("sso_code:%s", code), userID, 5*time.Minute)
+			// Store userID|sessionID so the token exchange can track which SSO session created it
+			redisClient.Set(ctx, fmt.Sprintf("sso_code:%s", code), userID+"|"+sid, 5*time.Minute)
 
 			redirectURL := fmt.Sprintf("%s?code=%s&state=%s",
 				redirectURI, url.QueryEscape(code), url.QueryEscape(state))
 			http.Redirect(w, r, redirectURL, http.StatusFound)
 			return
 		}
+		// Session cookie present but invalid — clear stale cookies
+		// so the login page JS doesn't auto-redirect and loop
+		clearSessionCookies(w)
 	}
 
 	redirectToLogin(w, r, clientID, redirectURI, state)
@@ -124,7 +129,7 @@ func SSOToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	codeKey := fmt.Sprintf("sso_code:%s", req.Code)
-	userID, err := redisClient.Get(ctx, codeKey).Result()
+	codeVal, err := redisClient.Get(ctx, codeKey).Result()
 	if err != nil {
 		JSONResponse(w, "Invalid or expired code", http.StatusBadRequest)
 		return
@@ -133,11 +138,20 @@ func SSOToken(w http.ResponseWriter, r *http.Request) {
 	// One-time use
 	redisClient.Del(ctx, codeKey)
 
+	// Parse userID|sessionID
+	parts := strings.SplitN(codeVal, "|", 2)
+	userID := parts[0]
+	sessionID := ""
+	if len(parts) == 2 {
+		sessionID = parts[1]
+	}
+
 	// Generate opaque token with metadata
 	token := generateCode()
 	tokenData := SSOTokenData{
 		UserID:    userID,
 		ClientID:  req.ClientID,
+		SessionID: sessionID,
 		UserAgent: r.UserAgent(),
 		Created:   time.Now().Format("2006-01-02 15:04"),
 	}
@@ -223,6 +237,19 @@ func revokeSSOToken(token string) {
 	tokenData, err := getSSOTokenData(token)
 	if err == nil {
 		redisClient.SRem(ctx, fmt.Sprintf("sso_user_tokens:%s", tokenData.UserID), token)
+	}
+	redisClient.Del(ctx, fmt.Sprintf("sso_token:%s", token))
+}
+
+// revokeSSOTokenAndSession revokes the token and also deletes the SSO session
+// that created it, forcing re-authentication. Used when kicking out from dashboard.
+func revokeSSOTokenAndSession(token string) {
+	tokenData, err := getSSOTokenData(token)
+	if err == nil {
+		redisClient.SRem(ctx, fmt.Sprintf("sso_user_tokens:%s", tokenData.UserID), token)
+		if tokenData.SessionID != "" {
+			DeleteSession(tokenData.SessionID)
+		}
 	}
 	redisClient.Del(ctx, fmt.Sprintf("sso_token:%s", token))
 }
@@ -321,6 +348,6 @@ func SSORevokeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	revokeSSOToken(token)
+	revokeSSOTokenAndSession(token)
 	JSONResponse(w, "Session revoked", http.StatusOK)
 }
