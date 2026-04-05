@@ -5,21 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
 
-var ssoClientsRaw = getEnv("SSO_CLIENTS", "demo|demosecret|http://localhost:9090/sso/callback")
 var ssoTokenTTL = time.Hour
-
-type SSOClient struct {
-	ClientID     string
-	ClientSecret string
-	RedirectURI  string
-}
 
 type SSOTokenData struct {
 	UserID    string `json:"user_id"`
@@ -27,28 +19,6 @@ type SSOTokenData struct {
 	SessionID string `json:"session_id"`
 	UserAgent string `json:"user_agent"`
 	Created   string `json:"created"`
-}
-
-var ssoClients map[string]*SSOClient
-
-func initSSOClients() {
-	ssoClients = make(map[string]*SSOClient)
-	if ssoClientsRaw == "" {
-		return
-	}
-	for _, entry := range strings.Split(ssoClientsRaw, ",") {
-		parts := strings.SplitN(strings.TrimSpace(entry), "|", 3)
-		if len(parts) != 3 {
-			log.Printf("[WARN] invalid SSO client entry: %s", entry)
-			continue
-		}
-		ssoClients[parts[0]] = &SSOClient{
-			ClientID:     parts[0],
-			ClientSecret: parts[1],
-			RedirectURI:  parts[2],
-		}
-	}
-	log.Printf("[INFO] loaded %d SSO client(s)", len(ssoClients))
 }
 
 func generateCode() string {
@@ -67,8 +37,8 @@ func SSOAuthorize(w http.ResponseWriter, r *http.Request) {
 	redirectURI := r.URL.Query().Get("redirect_uri")
 	state := r.URL.Query().Get("state")
 
-	client := ssoClients[clientID]
-	if client == nil {
+	client, err := GetSSOClient(clientID)
+	if err != nil {
 		http.Error(w, "Invalid client_id", http.StatusBadRequest)
 		return
 	}
@@ -122,8 +92,8 @@ func SSOToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ssoClients[req.ClientID]
-	if client == nil || client.ClientSecret != req.ClientSecret {
+	client, err := GetSSOClient(req.ClientID)
+	if err != nil || client.ClientSecret != req.ClientSecret {
 		JSONResponse(w, "Invalid client credentials", http.StatusUnauthorized)
 		return
 	}
@@ -304,7 +274,7 @@ func SSOSessions(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		clientURL := ""
-		if client := ssoClients[data.ClientID]; client != nil {
+		if client, err := GetSSOClient(data.ClientID); err == nil {
 			if u, err := url.Parse(client.RedirectURI); err == nil {
 				clientURL = u.Scheme + "://" + u.Host
 			}

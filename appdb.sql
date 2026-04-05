@@ -51,4 +51,17 @@ CREATE TABLE `user_login` (
   KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ----------------------------
+-- Table structure for sso_client
+-- ----------------------------
+DROP TABLE IF EXISTS `sso_client`;
+CREATE TABLE `sso_client` (
+  `id` varchar(255) NOT NULL,
+  `client_secret` varchar(255) NOT NULL,
+  `redirect_uri` varchar(1024) NOT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `created` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

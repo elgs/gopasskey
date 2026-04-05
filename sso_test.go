@@ -15,19 +15,11 @@ import (
 	"github.com/google/uuid"
 )
 
-func setupTestServer(t *testing.T) (*httptest.Server, func()) {
+func setupTestServer(t *testing.T) (*httptest.Server, string, func()) {
 	t.Helper()
 
 	initRedis()
 	initDB()
-
-	ssoClients = map[string]*SSOClient{
-		"testclient": {
-			ClientID:     "testclient",
-			ClientSecret: "testsecret",
-			RedirectURI:  "", // will be set after server starts
-		},
-	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/pub/sso/authorize", SSOAuthorize)
@@ -40,10 +32,14 @@ func setupTestServer(t *testing.T) (*httptest.Server, func()) {
 
 	ts := httptest.NewServer(Auth(mux))
 
-	// Set redirect URI now that we know the server URL
-	ssoClients["testclient"].RedirectURI = ts.URL + "/sso/callback"
+	// Create test client in DB with the test server URL
+	redirectURI := ts.URL + "/sso/callback"
+	db.Exec("DELETE FROM sso_client WHERE id = 'testclient'")
+	db.Exec("INSERT INTO sso_client (id, client_secret, redirect_uri, name) VALUES (?, ?, ?, ?)",
+		"testclient", "testsecret", redirectURI, "Test Client")
 
-	return ts, func() {
+	return ts, redirectURI, func() {
+		db.Exec("DELETE FROM sso_client WHERE id = 'testclient'")
 		ts.Close()
 		redisClient.Close()
 		db.Close()
@@ -78,7 +74,7 @@ func createTestSession(t *testing.T, userID string) string {
 }
 
 func TestSSOAuthorize_InvalidClientID(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	resp, err := http.Get(ts.URL + "/api/pub/sso/authorize?client_id=invalid&redirect_uri=http://example.com&state=abc")
@@ -91,7 +87,7 @@ func TestSSOAuthorize_InvalidClientID(t *testing.T) {
 }
 
 func TestSSOAuthorize_InvalidRedirectURI(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	resp, err := http.Get(ts.URL + "/api/pub/sso/authorize?client_id=testclient&redirect_uri=http://evil.com&state=abc")
@@ -104,15 +100,14 @@ func TestSSOAuthorize_InvalidRedirectURI(t *testing.T) {
 }
 
 func TestSSOAuthorize_NoSession_RedirectsToLogin(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, redirectURI, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
 
-	redirectURI := url.QueryEscape(ssoClients["testclient"].RedirectURI)
-	resp, err := client.Get(ts.URL + "/api/pub/sso/authorize?client_id=testclient&redirect_uri=" + redirectURI + "&state=mystate")
+	resp, err := client.Get(ts.URL + "/api/pub/sso/authorize?client_id=testclient&redirect_uri=" + url.QueryEscape(redirectURI) + "&state=mystate")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +121,7 @@ func TestSSOAuthorize_NoSession_RedirectsToLogin(t *testing.T) {
 }
 
 func TestSSOAuthorize_WithValidSession_IssuesCode(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, redirectURI, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	userID, cleanupUser := createTestUser(t)
@@ -145,7 +140,6 @@ func TestSSOAuthorize_WithValidSession_IssuesCode(t *testing.T) {
 		},
 	}
 
-	redirectURI := ssoClients["testclient"].RedirectURI
 	resp, err := client.Get(ts.URL + "/api/pub/sso/authorize?client_id=testclient&redirect_uri=" + url.QueryEscape(redirectURI) + "&state=mystate")
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +154,7 @@ func TestSSOAuthorize_WithValidSession_IssuesCode(t *testing.T) {
 }
 
 func TestSSOToken_InvalidCredentials(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	body := `{"code":"fake","client_id":"testclient","client_secret":"wrongsecret"}`
@@ -174,7 +168,7 @@ func TestSSOToken_InvalidCredentials(t *testing.T) {
 }
 
 func TestSSOToken_InvalidCode(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	body := `{"code":"fake","client_id":"testclient","client_secret":"testsecret"}`
@@ -188,7 +182,7 @@ func TestSSOToken_InvalidCode(t *testing.T) {
 }
 
 func TestSSOToken_CodeIsOneTimeUse(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	userID, cleanupUser := createTestUser(t)
@@ -220,7 +214,7 @@ func TestSSOToken_CodeIsOneTimeUse(t *testing.T) {
 }
 
 func TestSSOValidate_InvalidToken(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	req, _ := http.NewRequest("GET", ts.URL+"/api/pub/sso/validate", nil)
@@ -235,7 +229,7 @@ func TestSSOValidate_InvalidToken(t *testing.T) {
 }
 
 func TestSSOValidate_MissingAuthHeader(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	resp, err := http.Get(ts.URL + "/api/pub/sso/validate")
@@ -250,7 +244,7 @@ func TestSSOValidate_MissingAuthHeader(t *testing.T) {
 // TestSSOFullLoginFlow tests the complete SSO workflow:
 // authorize -> code exchange -> validate -> revoke
 func TestSSOFullLoginFlow(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, redirectURI, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	userID, cleanupUser := createTestUser(t)
@@ -271,7 +265,6 @@ func TestSSOFullLoginFlow(t *testing.T) {
 		},
 	}
 
-	redirectURI := ssoClients["testclient"].RedirectURI
 	resp, err := client.Get(ts.URL + "/api/pub/sso/authorize?client_id=testclient&redirect_uri=" + url.QueryEscape(redirectURI) + "&state=teststate")
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +360,7 @@ func TestSSOFullLoginFlow(t *testing.T) {
 
 // TestSSOLogout tests that SSO logout clears the session cookie
 func TestSSOLogout(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	userID, cleanupUser := createTestUser(t)
@@ -418,7 +411,7 @@ func TestSSOLogout(t *testing.T) {
 
 // TestSSOLogout_DefaultRedirect tests that logout redirects to / when no redirect_uri
 func TestSSOLogout_DefaultRedirect(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -436,7 +429,7 @@ func TestSSOLogout_DefaultRedirect(t *testing.T) {
 
 // TestSSOSessions tests listing and revoking sessions from the dashboard
 func TestSSOSessions(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	userID, cleanupUser := createTestUser(t)
@@ -517,7 +510,7 @@ func TestSSOSessions(t *testing.T) {
 
 // TestSSOSessions_Unauthorized tests that unauthenticated users can't list sessions
 func TestSSOSessions_Unauthorized(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	resp, err := http.Get(ts.URL + "/api/sso/sessions")
@@ -531,7 +524,7 @@ func TestSSOSessions_Unauthorized(t *testing.T) {
 
 // TestSSORevokeSession_WrongUser tests that a user can't revoke another user's session
 func TestSSORevokeSession_WrongUser(t *testing.T) {
-	ts, cleanup := setupTestServer(t)
+	ts, _, cleanup := setupTestServer(t)
 	defer cleanup()
 
 	// Create two users

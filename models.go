@@ -302,3 +302,36 @@ func SaveUser(user *PasskeyUser) error {
 	_, err := gosqlcrud.Update(db, user, "user")
 	return err
 }
+
+////////////////////////
+//                    //
+//    SSOClient       //
+//                    //
+////////////////////////
+
+type SSOClient struct {
+	ID           string  `json:"id" db:"id" pk:"true"`
+	ClientSecret string  `json:"client_secret" db:"client_secret"`
+	RedirectURI  string  `json:"redirect_uri" db:"redirect_uri"`
+	Name         *string `json:"name" db:"name"`
+	Created      *string `json:"created" db:"created"`
+}
+
+func GetSSOClient(clientID string) (*SSOClient, error) {
+	client := &SSOClient{ID: clientID}
+	err := gosqlcrud.Retrieve(db, client, "sso_client")
+	if err != nil {
+		return nil, err
+	}
+	client.ID = clientID
+	return client, nil
+}
+
+func GetAllSSOClients() ([]*SSOClient, error) {
+	clients := []*SSOClient{}
+	err := gosqlcrud.QueryToStructs(db, &clients, "SELECT * FROM sso_client")
+	if err != nil {
+		return nil, err
+	}
+	return clients, nil
+}

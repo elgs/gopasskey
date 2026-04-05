@@ -27,10 +27,11 @@ gopasskey can act as an SSO server for other projects. Uses opaque tokens stored
 
 ### Registering SSO Clients
 
-Set the `SSO_CLIENTS` environment variable. Format: `client_id|client_secret|redirect_uri`, comma-separated for multiple clients.
+SSO clients are stored in the `sso_client` table in the database.
 
-```
-SSO_CLIENTS=demo|demosecret|http://localhost:9090/sso/callback,app2|app2secret|https://app2.example.com/sso/callback
+```sql
+INSERT INTO sso_client (id, client_secret, redirect_uri, name) VALUES
+  ('demo', 'demosecret', 'http://localhost:9090/sso/callback', 'Demo App');
 ```
 
 ### Login Flow
@@ -196,7 +197,6 @@ The `sso_session` cookie is HttpOnly so JavaScript cannot access it — this pro
 | `DB_HOST` | `localhost` | MySQL host |
 | `DB_PORT` | `3306` | MySQL port |
 | `DB_NAME` | `appdb` | MySQL database name |
-| `SSO_CLIENTS` | `demo\|demosecret\|http://localhost:9090/sso/callback` | SSO client registry |
 | `SMTP_USER` | | SMTP sender email |
 | `SMTP_PASS` | | SMTP password |
 | `SMTP_HOST` | | SMTP host |

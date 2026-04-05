@@ -45,7 +45,6 @@ func main() {
 	initDB()
 	defer db.Close()
 	initPasskeyStore()
-	initSSOClients()
 	initApiServer()
 }
 
