@@ -429,6 +429,18 @@ Response (200):
 
 **Step 2.** Clear the client's own session (cookie, etc.).
 
+Example (Go, clearing an HttpOnly cookie named `sso_token`):
+
+```go
+http.SetCookie(w, &http.Cookie{
+    Name:     "sso_token",
+    Value:    "",
+    Path:     "/",
+    HttpOnly: true,
+    MaxAge:   -1,
+})
+```
+
 **Step 3.** Redirect the browser to SSO logout:
 
 ```
