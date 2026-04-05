@@ -326,6 +326,14 @@ GET https://sso.example.com/api/pub/sso/authorize
 
 Save the `state` value (e.g. in a cookie) to verify it later.
 
+This is a browser redirect, not an API call. The SSO server will either redirect back with a code (if the user is already logged in) or show the login page.
+
+Successful redirect back to client:
+
+```
+GET https://myapp.example.com/sso/callback?code=abc123&state=<same nonce>
+```
+
 ### 2. Callback handler
 
 Handle `GET /sso/callback?code=X&state=Y`:
@@ -333,35 +341,100 @@ Handle `GET /sso/callback?code=X&state=Y`:
 1. Verify `state` matches what was saved.
 2. Exchange the code for a token (server-to-server):
 
+Request:
+
 ```
 POST https://sso.example.com/api/pub/sso/token
 Content-Type: application/json
 
-{"code": "X", "client_id": "myapp", "client_secret": "mysecret"}
+{"code": "abc123", "client_id": "myapp", "client_secret": "mysecret"}
 ```
 
-Response: `{"access_token": "...", "token_type": "Bearer", "expires_in": 3600}`
+Success response (200):
+
+```json
+{
+  "access_token": "a1b2c3d4e5f6...",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}
+```
+
+Error responses:
+
+```json
+// 400 — invalid or expired code
+"Invalid or expired code"
+
+// 401 — wrong client_id or client_secret
+"Invalid client credentials"
+```
 
 3. Store the `access_token` (e.g. in an HttpOnly cookie).
 
 ### 3. Token validation
 
-On each authenticated request, call:
+On each authenticated request, the client backend calls:
+
+Request:
 
 ```
 GET https://sso.example.com/api/pub/sso/validate
-Authorization: Bearer <token>
+Authorization: Bearer a1b2c3d4e5f6...
 ```
 
-Response (200): `{"sub": "user-uuid", "email": "...", "name": "...", "display_name": "..."}`
+Success response (200):
 
-If 401: token is invalid or expired. Clear the client session and redirect to login.
+```json
+{
+  "sub": "550e8400-e29b-41d4-a716-446655440000",
+  "email": "user@example.com",
+  "name": "Jane Doe",
+  "display_name": "Jane"
+}
+```
+
+Error responses:
+
+```json
+// 401 — missing Authorization header
+"Missing or invalid Authorization header"
+
+// 401 — token expired or revoked
+"Invalid or expired token"
+```
+
+On 401, clear the client session and show the login page.
 
 ### 4. Logout
 
-1. Revoke the token: `POST /api/pub/sso/revoke` with `Authorization: Bearer <token>`
-2. Clear the client's own session (cookie, etc.)
-3. Redirect browser to: `GET /api/pub/sso/logout?redirect_uri=https://myapp.example.com/logged-out`
+Three steps, in order:
+
+**Step 1.** Revoke the token (server-to-server):
+
+Request:
+
+```
+POST https://sso.example.com/api/pub/sso/revoke
+Authorization: Bearer a1b2c3d4e5f6...
+```
+
+Response (200):
+
+```json
+"Token revoked"
+```
+
+**Step 2.** Clear the client's own session (cookie, etc.).
+
+**Step 3.** Redirect the browser to SSO logout:
+
+```
+GET https://sso.example.com/api/pub/sso/logout
+    ?redirect_uri=https://myapp.example.com/logged-out
+```
+
+The SSO server clears its session and cookies, then redirects the browser to `redirect_uri`.
 
 A complete working example is in the `gopasskey_client` directory.
 
