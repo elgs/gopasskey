@@ -23,25 +23,6 @@ customElements.define('web-login',
         this.rememberMe = true;
       }
 
-      // Store SSO params if present in URL
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('sso_client_id')) {
-        sessionStorage.setItem('sso_client_id', urlParams.get('sso_client_id'));
-        sessionStorage.setItem('sso_redirect_uri', urlParams.get('sso_redirect_uri') || '');
-        sessionStorage.setItem('sso_state', urlParams.get('sso_state') || '');
-      }
-
-      // Check if user has a valid session
-      try {
-        const resp = await fetch(`${env.apiUrl}me`);
-        if (resp.ok) {
-          if (this._handleSSORedirect()) return;
-          this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
-          return;
-        }
-      } catch (e) {}
-      // Session invalid — clear stale cookie
-      document.cookie = 'sso_logged_in=; Max-Age=0; Path=/';
     }
 
     _handleSSORedirect() {

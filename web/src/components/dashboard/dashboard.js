@@ -16,6 +16,15 @@ customElements.define('web-dashboard',
     credentialsLoaded = false;
     ssoSessions = [];
     sessionsLoaded = false;
+    isAdmin = false;
+    ssoClients = [];
+    clientsLoaded = false;
+    users = [];
+    usersLoaded = false;
+    clientForm = { id: '', client_secret: '', redirect_uri: '', name: '' };
+    clientEditMode = false;
+    clientDialogTitle = '';
+    userForm = { id: '', email: '', name: '', display_name: '', is_active: false, is_admin: false };
     logoutLoading = false;
     profileLoading = false;
     registerLoading = false;
@@ -29,6 +38,10 @@ customElements.define('web-dashboard',
       this.page = page;
       if (page === 'sessions') {
         this.loadSSOSessions();
+      } else if (page === 'clients') {
+        this.loadClients();
+      } else if (page === 'users') {
+        this.loadUsers();
       }
     }
 
@@ -75,6 +88,10 @@ customElements.define('web-dashboard',
       await this.loadUserData();
       if (this.page === 'sessions') {
         this.loadSSOSessions();
+      } else if (this.page === 'clients' && this.isAdmin) {
+        this.loadClients();
+      } else if (this.page === 'users' && this.isAdmin) {
+        this.loadUsers();
       }
     }
 
@@ -121,6 +138,7 @@ customElements.define('web-dashboard',
           this.email = user.email;
           this.userName = user.name || '';
           this.userDisplayName = user.display_name || '';
+          this.isAdmin = !!user.is_admin;
         } else {
           document.cookie = 'sso_logged_in=; Max-Age=0; Path=/';
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
@@ -326,6 +344,156 @@ customElements.define('web-dashboard',
         }
       } catch (error) {
         this.showToast(error.message, 'danger');
+      }
+    }
+
+    async loadClients() {
+      try {
+        const response = await fetch(`${env.apiUrl}admin/clients`);
+        if (response.ok) {
+          this.ssoClients = (await response.json()) || [];
+          this.clientsLoaded = true;
+          this.update();
+        }
+      } catch (e) {}
+    }
+
+    openClientDialog(client) {
+      if (client) {
+        this.clientForm = { id: client.id, client_secret: client.client_secret, redirect_uri: client.redirect_uri, name: client.name || '' };
+        this.clientEditMode = true;
+        this.clientDialogTitle = 'Edit Client';
+      } else {
+        this.clientForm = { id: '', client_secret: '', redirect_uri: '', name: '' };
+        this.clientEditMode = false;
+        this.clientDialogTitle = 'Add Client';
+      }
+      this.update();
+      this.querySelector('.client-dialog').showModal();
+    }
+
+    closeClientDialog() {
+      this.querySelector('.client-dialog').close();
+    }
+
+    async saveClient() {
+      const url = this.clientEditMode
+        ? `${env.apiUrl}admin/client?id=${encodeURIComponent(this.clientForm.id)}`
+        : `${env.apiUrl}admin/clients`;
+      const method = this.clientEditMode ? 'PUT' : 'POST';
+      try {
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(this.clientForm),
+        });
+        const msg = await response.json();
+        if (response.ok) {
+          this.closeClientDialog();
+          this.showToast(msg);
+          await this.loadClients();
+        } else {
+          this.showToast(msg, 'danger');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'danger');
+      }
+    }
+
+    async deleteClient(clientID) {
+      const confirmed = await this.showConfirm({
+        title: 'Delete Client',
+        message: `Delete SSO client "${clientID}"? Existing sessions will continue until they expire.`,
+        action: 'Delete',
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        const response = await fetch(`${env.apiUrl}admin/client?id=${encodeURIComponent(clientID)}`, { method: 'DELETE' });
+        const msg = await response.json();
+        if (response.ok) {
+          this.showToast(msg);
+          await this.loadClients();
+        } else {
+          this.showToast(msg, 'danger');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'danger');
+      }
+    }
+
+    async loadUsers() {
+      try {
+        const response = await fetch(`${env.apiUrl}admin/users`);
+        if (response.ok) {
+          this.users = (await response.json()) || [];
+          this.usersLoaded = true;
+          this.update();
+        }
+      } catch (e) {}
+    }
+
+    openUserDialog(user) {
+      this.userForm = {
+        id: user.id,
+        email: user.email,
+        name: user.name || '',
+        display_name: user.display_name || '',
+        is_active: !!user.is_active,
+        is_admin: !!user.is_admin,
+      };
+      this.update();
+      this.querySelector('.user-dialog').showModal();
+    }
+
+    closeUserDialog() {
+      this.querySelector('.user-dialog').close();
+    }
+
+    async saveUser() {
+      try {
+        const response = await fetch(`${env.apiUrl}admin/user?id=${encodeURIComponent(this.userForm.id)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: this.userForm.name,
+            display_name: this.userForm.display_name,
+            is_active: this.userForm.is_active,
+            is_admin: this.userForm.is_admin,
+          }),
+        });
+        const msg = await response.json();
+        if (response.ok) {
+          this.closeUserDialog();
+          this.showToast(msg);
+          await this.loadUsers();
+        } else {
+          this.showToast(msg, 'danger');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'danger');
+      }
+    }
+
+    async deleteUser(user) {
+      const confirmed = await this.showConfirm({
+        title: 'Delete User',
+        message: `Delete user "${user.email}"? This is a soft delete — the account will be marked inactive.`,
+        action: 'Delete',
+        danger: true,
+      });
+      if (!confirmed) return;
+      try {
+        const response = await fetch(`${env.apiUrl}admin/user?id=${encodeURIComponent(user.id)}`, { method: 'DELETE' });
+        const msg = await response.json();
+        if (response.ok) {
+          this.showToast(msg);
+          await this.loadUsers();
+        } else {
+          this.showToast(msg, 'danger');
+        }
+      } catch (e) {
+        this.showToast(e.message, 'danger');
       }
     }
 

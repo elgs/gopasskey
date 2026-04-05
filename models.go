@@ -28,6 +28,7 @@ type PasskeyUser struct { // implements webauthn.User
 	Status      string    `json:"status" db:"status"`
 	IsActive    bool      `json:"is_active" db:"is_active"`
 	IsDeleted   bool      `json:"is_deleted" db:"is_deleted"`
+	IsAdmin     bool      `json:"is_admin" db:"is_admin"`
 }
 
 func (this *PasskeyUser) WebAuthnID() []byte {
@@ -260,6 +261,7 @@ func CreateUser(email, name, displayName string) (*PasskeyUser, error) {
 		Status:      "",
 		IsActive:    true,
 		IsDeleted:   false,
+		IsAdmin:     false,
 	}
 	result, err := gosqlcrud.Create(db, user, "user")
 	if err != nil {
@@ -303,6 +305,17 @@ func SaveUser(user *PasskeyUser) error {
 	return err
 }
 
+func GetAllUsers() ([]PasskeyUser, error) {
+	users := []PasskeyUser{}
+	err := gosqlcrud.QueryToStructs(db, &users, "SELECT * FROM user WHERE is_deleted = 0 ORDER BY created DESC")
+	return users, err
+}
+
+func DeleteUser(id string) error {
+	_, err := db.Exec("UPDATE user SET is_deleted = 1 WHERE id = ?", id)
+	return err
+}
+
 ////////////////////////
 //                    //
 //    SSOClient       //
@@ -329,9 +342,26 @@ func GetSSOClient(clientID string) (*SSOClient, error) {
 
 func GetAllSSOClients() ([]*SSOClient, error) {
 	clients := []*SSOClient{}
-	err := gosqlcrud.QueryToStructs(db, &clients, "SELECT * FROM sso_client")
+	err := gosqlcrud.QueryToStructs(db, &clients, "SELECT * FROM sso_client ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
 	return clients, nil
+}
+
+func CreateSSOClient(client *SSOClient) error {
+	_, err := db.Exec("INSERT INTO sso_client (id, client_secret, redirect_uri, name) VALUES (?, ?, ?, ?)",
+		client.ID, client.ClientSecret, client.RedirectURI, client.Name)
+	return err
+}
+
+func UpdateSSOClient(client *SSOClient) error {
+	_, err := db.Exec("UPDATE sso_client SET client_secret = ?, redirect_uri = ?, name = ? WHERE id = ?",
+		client.ClientSecret, client.RedirectURI, client.Name, client.ID)
+	return err
+}
+
+func DeleteSSOClient(id string) error {
+	_, err := db.Exec("DELETE FROM sso_client WHERE id = ?", id)
+	return err
 }

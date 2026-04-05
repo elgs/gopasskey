@@ -87,6 +87,14 @@ func initApiServer() {
 	mux.HandleFunc("GET /api/sso/sessions", SSOSessions)
 	mux.HandleFunc("DELETE /api/sso/session", SSORevokeSession)
 
+	mux.HandleFunc("GET /api/admin/clients", AdminListClients)
+	mux.HandleFunc("POST /api/admin/clients", AdminCreateClient)
+	mux.HandleFunc("PUT /api/admin/client", AdminUpdateClient)
+	mux.HandleFunc("DELETE /api/admin/client", AdminDeleteClient)
+	mux.HandleFunc("GET /api/admin/users", AdminListUsers)
+	mux.HandleFunc("PUT /api/admin/user", AdminUpdateUser)
+	mux.HandleFunc("DELETE /api/admin/user", AdminDeleteUser)
+
 	handler := CORS(Auth(mux))
 	addr := fmt.Sprintf("%s:%s", host, port)
 	log.Printf("Listening on http://%s\n", addr)

@@ -14,6 +14,14 @@
         <i class="ui-icon ui-icon-monitor"></i>
         <span>Sessions</span>
       </a>
+      <a lw-if="isAdmin" class="ui-menu-item" lw-class:active="page === 'clients'" lw-on:click="navigate('clients')" href="#clients">
+        <i class="ui-icon ui-icon-server"></i>
+        <span>Clients</span>
+      </a>
+      <a lw-if="isAdmin" class="ui-menu-item" lw-class:active="page === 'users'" lw-on:click="navigate('users')" href="#users">
+        <i class="ui-icon ui-icon-users"></i>
+        <span>Users</span>
+      </a>
     </div>
     <div class="ui-menu borderless">
       <hr class="ui-menu-divider">
@@ -125,8 +133,149 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Clients (admin only) -->
+    <div lw-if="page === 'clients' && isAdmin" class="ui-panel flat">
+      <div class="ui-panel-header">
+        <h3 class="ui-panel-title">SSO Clients</h3>
+        <div class="ui-panel-actions">
+          <button class="ui-btn sm" lw-on:click="openClientDialog(null)">Add Client</button>
+        </div>
+      </div>
+      <div lw-if="clientsLoaded && ssoClients.length === 0" class="ui-panel-body">
+        <div class="ui-empty sm">
+          <div class="ui-empty-icon"><i class="ui-icon ui-icon-server"></i></div>
+          <p class="ui-empty-description">No SSO clients registered.</p>
+        </div>
+      </div>
+      <table lw-if="ssoClients.length > 0" class="ui-table borderless">
+        <thead>
+          <tr>
+            <th>Client ID</th>
+            <th>Name</th>
+            <th>Redirect URI</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr lw-for="c in ssoClients">
+            <td lw>c.id</td>
+            <td lw>c.name</td>
+            <td lw>c.redirect_uri</td>
+            <td class="action-cell">
+              <button class="ui-btn outline sm" lw-on:click="openClientDialog(c)">Edit</button>
+              <button class="ui-btn outline danger sm" lw-on:click="deleteClient(c.id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Users (admin only) -->
+    <div lw-if="page === 'users' && isAdmin" class="ui-panel flat">
+      <div class="ui-panel-header">
+        <h3 class="ui-panel-title">Users</h3>
+      </div>
+      <div lw-if="usersLoaded && users.length === 0" class="ui-panel-body">
+        <div class="ui-empty sm">
+          <div class="ui-empty-icon"><i class="ui-icon ui-icon-users"></i></div>
+          <p class="ui-empty-description">No users.</p>
+        </div>
+      </div>
+      <table lw-if="users.length > 0" class="ui-table borderless">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Name</th>
+            <th>Display Name</th>
+            <th>Active</th>
+            <th>Admin</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr lw-for="u in users">
+            <td lw>u.email</td>
+            <td lw>u.name</td>
+            <td lw>u.display_name</td>
+            <td lw>u.is_active ? 'Yes' : 'No'</td>
+            <td lw>u.is_admin ? 'Yes' : 'No'</td>
+            <td class="action-cell">
+              <button class="ui-btn outline sm" lw-on:click="openUserDialog(u)">Edit</button>
+              <button class="ui-btn outline danger sm" lw-on:click="deleteUser(u)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </main>
 </div>
+
+<!-- Client edit dialog -->
+<dialog class="ui-dialog sm client-dialog">
+  <div class="ui-dialog-header">
+    <h3 lw class="ui-dialog-title">clientDialogTitle</h3>
+  </div>
+  <div class="ui-dialog-body">
+    <div class="ui-stack sm">
+      <div class="ui-field">
+        <label class="ui-label">Client ID</label>
+        <input class="ui-input" type="text" lw-model="clientForm.id" lw-bind:disabled="clientEditMode">
+      </div>
+      <div class="ui-field">
+        <label class="ui-label">Client Secret</label>
+        <input class="ui-input" type="text" lw-model="clientForm.client_secret">
+      </div>
+      <div class="ui-field">
+        <label class="ui-label">Redirect URI</label>
+        <input class="ui-input" type="text" lw-model="clientForm.redirect_uri">
+      </div>
+      <div class="ui-field">
+        <label class="ui-label">Name</label>
+        <input class="ui-input" type="text" lw-model="clientForm.name">
+      </div>
+    </div>
+  </div>
+  <div class="ui-dialog-footer">
+    <button class="ui-btn outline sm" lw-on:click="closeClientDialog()">Cancel</button>
+    <button class="ui-btn sm" lw-on:click="saveClient()">Save</button>
+  </div>
+</dialog>
+
+<!-- User edit dialog -->
+<dialog class="ui-dialog sm user-dialog">
+  <div class="ui-dialog-header">
+    <h3 class="ui-dialog-title">Edit User</h3>
+  </div>
+  <div class="ui-dialog-body">
+    <div class="ui-stack sm">
+      <div class="ui-field">
+        <label class="ui-label">Email</label>
+        <input class="ui-input" type="email" lw-model="userForm.email" disabled>
+      </div>
+      <div class="ui-field">
+        <label class="ui-label">Name</label>
+        <input class="ui-input" type="text" lw-model="userForm.name">
+      </div>
+      <div class="ui-field">
+        <label class="ui-label">Display Name</label>
+        <input class="ui-input" type="text" lw-model="userForm.display_name">
+      </div>
+      <label class="ui-checkbox">
+        <input type="checkbox" lw-model="userForm.is_active">
+        <span>Active</span>
+      </label>
+      <label class="ui-checkbox">
+        <input type="checkbox" lw-model="userForm.is_admin">
+        <span>Admin</span>
+      </label>
+    </div>
+  </div>
+  <div class="ui-dialog-footer">
+    <button class="ui-btn outline sm" lw-on:click="closeUserDialog()">Cancel</button>
+    <button class="ui-btn sm" lw-on:click="saveUser()">Save</button>
+  </div>
+</dialog>
 
 <div class="ui-toast-container top-center"></div>
 

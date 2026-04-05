@@ -15,6 +15,7 @@ CREATE TABLE `user` (
   `status` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT NULL,
   `is_deleted` tinyint(1) DEFAULT NULL,
+  `is_admin` tinyint(1) DEFAULT 0,
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE KEY `email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
