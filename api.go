@@ -607,7 +607,7 @@ func Auth(next http.Handler) http.Handler {
 }
 
 func getSessionID(r *http.Request) string {
-	cookie, err := r.Cookie("sid")
+	cookie, err := r.Cookie("sso_session")
 	if err != nil {
 		return ""
 	}
@@ -616,7 +616,7 @@ func getSessionID(r *http.Request) string {
 
 func setSessionCookies(w http.ResponseWriter, sid string, ttl time.Duration) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "sid",
+		Name:     "sso_session",
 		Value:    sid,
 		Path:     "/",
 		HttpOnly: true,
@@ -624,7 +624,7 @@ func setSessionCookies(w http.ResponseWriter, sid string, ttl time.Duration) {
 		MaxAge:   int(ttl.Seconds()),
 	})
 	http.SetCookie(w, &http.Cookie{
-		Name:     "logged_in",
+		Name:     "sso_logged_in",
 		Value:    "1",
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
@@ -633,8 +633,8 @@ func setSessionCookies(w http.ResponseWriter, sid string, ttl time.Duration) {
 }
 
 func clearSessionCookies(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{Name: "sid", MaxAge: -1, Path: "/"})
-	http.SetCookie(w, &http.Cookie{Name: "logged_in", MaxAge: -1, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "sso_session", MaxAge: -1, Path: "/"})
+	http.SetCookie(w, &http.Cookie{Name: "sso_logged_in", MaxAge: -1, Path: "/"})
 }
 
 // JSONResponse is a helper function to send json response

@@ -48,18 +48,18 @@ GET https://sso.example.com/api/pub/sso/authorize
 
 #### Step 2: SSO checks for existing session
 
-The SSO server reads the `sid` cookie from the browser.
+The SSO server reads the `sso_session` cookie from the browser.
 
 - **If valid session exists**: skip to Step 4 (no login needed).
 - **If no session**: redirect to the SSO login page with SSO params preserved in the URL.
 
 #### Step 3: User authenticates
 
-The user authenticates via passkey or email magic link on the SSO login page. On success, the SSO server sets an HttpOnly `sid` cookie on the SSO domain. The login page JS then redirects back to `/api/pub/sso/authorize` with the same `client_id`, `redirect_uri`, and `state` params.
+The user authenticates via passkey or email magic link on the SSO login page. On success, the SSO server sets an HttpOnly `sso_session` cookie on the SSO domain. The login page JS then redirects back to `/api/pub/sso/authorize` with the same `client_id`, `redirect_uri`, and `state` params.
 
 #### Step 4: SSO issues auth code
 
-The SSO server validates the `sid` cookie, generates a one-time auth code (stored in Redis, 5 min TTL), and redirects the browser to:
+The SSO server validates the `sso_session` cookie, generates a one-time auth code (stored in Redis, 5 min TTL), and redirects the browser to:
 
 ```
 GET https://myapp.example.com/sso/callback
@@ -135,7 +135,7 @@ GET https://sso.example.com/api/pub/sso/logout
     ?redirect_uri=https://myapp.example.com/logged-out
 ```
 
-The SSO server clears the `sid` cookie and the Redis session, then redirects the browser to the `redirect_uri`.
+The SSO server clears the `sso_session` cookie and the Redis session, then redirects the browser to the `redirect_uri`.
 
 **Why both steps?** Step 1 revokes the client's token (so it can't be used again). Step 2 clears the SSO session (so the user isn't auto-logged-in next time they visit any client). Skipping Step 2 means the user appears logged out of the client, but the SSO session is still alive and any client will silently get a new token on the next visit.
 
@@ -159,16 +159,16 @@ A client app needs to:
 3. Store the token and send it on each request to `GET /api/pub/sso/validate`
 4. On logout: revoke via `POST /api/pub/sso/revoke`, then redirect to `GET /api/pub/sso/logout?redirect_uri=...`
 
-A minimal Go client example is at [gopasskey_client](https://github.com/user/gopasskey_client).
+A minimal Go client example is in the `gopasskey_client` directory.
 
 ## Cookies
 
 | Cookie | Domain | HttpOnly | Purpose |
 |---|---|---|---|
-| `sid` | SSO server | Yes | Authenticated user session ID |
-| `logged_in` | SSO server | No | JS-readable flag for UI state (not sensitive) |
+| `sso_session` | SSO server | Yes | Authenticated user session ID |
+| `sso_logged_in` | SSO server | No | JS-readable flag for UI state (not sensitive) |
 
-The `sid` cookie is HttpOnly so JavaScript cannot access it — this protects against XSS. The `logged_in` cookie is a non-sensitive flag that the frontend reads to decide whether to show the login page or dashboard.
+The `sso_session` cookie is HttpOnly so JavaScript cannot access it — this protects against XSS. The `sso_logged_in` cookie is a non-sensitive flag that the frontend reads to decide whether to show the login page or dashboard.
 
 ## Redis Keys
 
@@ -177,7 +177,7 @@ The `sid` cookie is HttpOnly so JavaScript cannot access it — this protects ag
 | `passkey_session:{id}` | String | 5 min / 1 hour | JSON `webauthn.SessionData` | WebAuthn handshake (5 min) or authenticated user session (1 hour) |
 | `passkey_confirm:{token}` | String | 5 min | `userID\|userAgent\|credentialJSON` | Pending credential replacement confirmation |
 | `sso_code:{code}` | String | 5 min | `userID` | One-time auth code during SSO code exchange |
-| `sso_token:{token}` | String | 1 hour (sliding) | JSON `{"user_id", "client_id", "created"}` | Opaque SSO token for client apps |
+| `sso_token:{token}` | String | 1 hour (sliding) | JSON `{"user_id", "client_id", "user_agent", "created"}` | Opaque SSO token for client apps |
 | `sso_user_tokens:{userID}` | Set | none | Set of token strings | Tracks all active SSO tokens per user |
 
 ## Environment Variables

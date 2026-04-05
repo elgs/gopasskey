@@ -32,7 +32,7 @@ customElements.define('web-login',
       }
 
       // Check if user is logged in (cookie set by server)
-      if (document.cookie.includes('logged_in=')) {
+      if (document.cookie.includes('sso_logged_in=')) {
         if (this._handleSSORedirect()) return;
         this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
       }
