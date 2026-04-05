@@ -326,13 +326,15 @@ GET https://sso.example.com/api/pub/sso/authorize
 
 Save the `state` value (e.g. in a cookie) to verify it later.
 
-This is a browser redirect, not an API call. The SSO server will either redirect back with a code (if the user is already logged in) or show the login page.
+This is a browser redirect, not an API call. The SSO server will either show the login page (if the user isn't logged in yet) or redirect back to the client callback with a one-time `code`.
 
 Successful redirect back to client:
 
 ```
 GET https://myapp.example.com/sso/callback?code=abc123&state=<same nonce>
 ```
+
+The `code` is a short-lived (5 min), single-use authorization code. It proves that the SSO server authenticated the user, but it is not yet a usable token. The client must exchange it for an access token in the next step, using its `client_secret`. This two-step exchange (code then token) keeps the actual token off the user's browser URL bar, browser history, and referer headers.
 
 ### 2. Callback handler
 
