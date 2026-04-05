@@ -28,7 +28,7 @@ func setupTestServer(t *testing.T) (*httptest.Server, string, func()) {
 	mux.HandleFunc("POST /api/pub/sso/revoke", SSORevoke)
 	mux.HandleFunc("GET /api/pub/sso/logout", SSOLogout)
 	mux.HandleFunc("GET /api/sso/sessions", SSOSessions)
-	mux.HandleFunc("DELETE /api/sso/sessions", SSORevokeSession)
+	mux.HandleFunc("DELETE /api/sso/session", SSORevokeSession)
 
 	ts := httptest.NewServer(Auth(mux))
 
@@ -477,7 +477,7 @@ func TestSSOSessions(t *testing.T) {
 	}
 
 	// Revoke one session
-	req, _ := http.NewRequest("DELETE", ts.URL+"/api/sso/sessions?token="+token1, nil)
+	req, _ := http.NewRequest("DELETE", ts.URL+"/api/sso/session?token="+token1, nil)
 	resp, err = client.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -555,7 +555,7 @@ func TestSSORevokeSession_WrongUser(t *testing.T) {
 	client := &http.Client{Jar: jar}
 
 	// Try to revoke user2's token
-	req, _ := http.NewRequest("DELETE", ts.URL+"/api/sso/sessions?token="+token, nil)
+	req, _ := http.NewRequest("DELETE", ts.URL+"/api/sso/session?token="+token, nil)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)

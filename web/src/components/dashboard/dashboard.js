@@ -313,7 +313,7 @@ customElements.define('web-dashboard',
       if (!confirmed) return;
 
       try {
-        const response = await fetch(`${env.apiUrl}sso/sessions?token=${encodeURIComponent(token)}`, {
+        const response = await fetch(`${env.apiUrl}sso/session?token=${encodeURIComponent(token)}`, {
           method: 'DELETE',
         });
 

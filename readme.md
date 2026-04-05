@@ -163,7 +163,7 @@ The SSO server sets two cookies on its own domain:
 | DELETE | `/api/credentials` | Delete a passkey |
 | POST | `/api/logout` | Log out (clear session) |
 | GET | `/api/sso/sessions` | List active client sessions |
-| DELETE | `/api/sso/sessions` | Kick out a client session |
+| DELETE | `/api/sso/session` | Kick out a client session |
 
 ## SSO Login Flow
 
