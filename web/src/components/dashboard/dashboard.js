@@ -12,8 +12,8 @@ customElements.define('web-dashboard',
     email = '';
     userName = '';
     userDisplayName = '';
-    message = '';
     credentials = [];
+    credentialsLoaded = false;
     logoutLoading = false;
     profileLoading = false;
     registerLoading = false;
@@ -27,9 +27,40 @@ customElements.define('web-dashboard',
       this.page = page;
     }
 
+    showToast(text, type = 'success', duration = 3000) {
+      const container = this.querySelector('.ui-toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'ui-toast ' + type;
+      toast.innerHTML = `<span class="ui-toast-body">${text}</span><button class="ui-toast-close" onclick="this.parentElement.remove()">&times;</button>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), duration);
+    }
+
+    onResizeStart(e) {
+      e.preventDefault();
+      const sidebar = this.querySelector('.sidebar');
+      const handle = this.querySelector('.resize-handle');
+      handle.classList.add('active');
+      const onMove = (e) => {
+        const width = Math.min(400, Math.max(140, e.clientX));
+        sidebar.style.width = width + 'px';
+      };
+      const onUp = () => {
+        handle.classList.remove('active');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        localStorage.setItem('sidebar-width', sidebar.style.width);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+
     aaguids = {};
 
     async domReady() {
+      const savedWidth = localStorage.getItem('sidebar-width');
+      if (savedWidth) this.querySelector('.sidebar').style.width = savedWidth;
+
       fetch('resources/aaguids.json').then(r => r.json()).then(data => {
         this.aaguids = data;
         this.update();
@@ -108,6 +139,7 @@ customElements.define('web-dashboard',
         if (response.ok) {
           const data = await response.json();
           this.credentials = data || [];
+          this.credentialsLoaded = true;
           this.update();
         }
       } catch (error) {
@@ -154,12 +186,12 @@ customElements.define('web-dashboard',
         if (response.ok) {
           this.userName = data.name || '';
           this.userDisplayName = data.display_name || '';
-          this.message = 'Profile updated';
+          this.showToast('Profile updated');
         } else {
-          this.message = 'Error: ' + data;
+          this.showToast(data, 'danger');
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.showToast(error.message, 'danger');
       } finally {
         this.profileLoading = false;
       }
@@ -183,20 +215,20 @@ customElements.define('web-dashboard',
 
         const msg = await response.json();
         if (response.ok) {
-          this.message = msg;
+          this.showToast(msg);
           await this.loadCredentials();
         } else {
-          this.message = 'Error: ' + msg;
+          this.showToast(msg, 'danger');
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.showToast(error.message, 'danger');
       }
     }
 
     async registerPasskey() {
       const sid = localStorage.getItem('sid');
       if (!sid) {
-        this.message = 'Not logged in';
+        this.showToast('Not logged in', 'danger');
         return;
       }
 
@@ -230,7 +262,7 @@ customElements.define('web-dashboard',
 
         const result = await verificationResponse.json();
         if (!verificationResponse.ok) {
-          this.message = 'Error: ' + result;
+          this.showToast(result, 'danger');
         } else if (result.status === 'duplicate') {
           const confirmed = await this.showConfirm({
             title: 'Replace Passkey',
@@ -245,17 +277,17 @@ customElements.define('web-dashboard',
               body: JSON.stringify({ confirm_token: result.confirm_token })
             });
             const confirmResult = await confirmResponse.json();
-            this.message = confirmResult.message || confirmResult;
+            this.showToast(confirmResult.message || confirmResult);
           } else {
-            this.message = 'Registration cancelled';
+            this.showToast('Registration cancelled', 'warning');
           }
           await this.loadCredentials();
         } else {
-          this.message = result.message || result;
+          this.showToast(result.message || result);
           await this.loadCredentials();
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.showToast(error.message, 'danger');
       } finally {
         this.registerLoading = false;
       }
@@ -276,10 +308,10 @@ customElements.define('web-dashboard',
           localStorage.removeItem('sid');
           this.dispatchEvent(new CustomEvent('logout', { bubbles: true, composed: true }));
         } else {
-          this.message = 'Error: ' + msg;
+          this.showToast(msg, 'danger');
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.showToast(error.message, 'danger');
       } finally {
         this.logoutLoading = false;
       }

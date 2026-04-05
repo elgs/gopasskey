@@ -12,6 +12,7 @@ customElements.define('web-login',
     savedEmail = '';
     rememberMe = false;
     message = '';
+    messageType = '';
     emailLoading = false;
     passkeyLoading = false;
 
@@ -57,13 +58,22 @@ customElements.define('web-login',
 
     async onEmailKeydown(event) {
       if (event.key === 'Enter') {
-        await this.loginWithEmail();
+        if (this.savedEmail) {
+          await this.loginWithPasskey();
+        } else {
+          await this.loginWithEmail();
+        }
       }
+    }
+
+    setMessage(text, type = '') {
+      this.message = text;
+      this.messageType = type;
     }
 
     async loginWithEmail() {
       if (!this.email) {
-        this.message = 'Please enter your email';
+        this.setMessage('Please enter your email', 'danger');
         return;
       }
 
@@ -79,12 +89,12 @@ customElements.define('web-login',
         const msg = await response.json();
         if (response.ok) {
           this.saveEmailIfRemembered();
-          this.message = msg;
+          this.setMessage(msg);
         } else {
-          this.message = 'Error: ' + msg;
+          this.setMessage(msg, 'danger');
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.setMessage(error.message, 'danger');
       } finally {
         this.emailLoading = false;
       }
@@ -92,7 +102,7 @@ customElements.define('web-login',
 
     async loginWithPasskey() {
       if (!this.email) {
-        this.message = 'Please enter your email';
+        this.setMessage('Please enter your email', 'danger');
         return;
       }
 
@@ -135,10 +145,10 @@ customElements.define('web-login',
           this.saveEmailIfRemembered();
           this.dispatchEvent(new CustomEvent('login', { bubbles: true, composed: true }));
         } else {
-          this.message = 'Error: ' + msg;
+          this.setMessage(msg, 'danger');
         }
       } catch (error) {
-        this.message = 'Error: ' + error.message;
+        this.setMessage(error.message, 'danger');
       } finally {
         this.passkeyLoading = false;
       }

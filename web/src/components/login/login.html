@@ -1,12 +1,12 @@
 <div class="ui-panel raised login-panel">
   <div class="ui-panel-header">
-    <h2 class="ui-panel-title">GoPasskey</h2>
+    <h2 class="ui-panel-title">az code lab</h2>
   </div>
 
   <div class="ui-panel-body">
     <div class="ui-stack">
 
-      <div lw lw-if="message" class="ui-alert">message</div>
+      <div lw lw-if="message" class="ui-alert" lw-class:danger="messageType === 'danger'">message</div>
 
       <div class="ui-stack sm">
         <div class="ui-field">
@@ -17,9 +17,11 @@
           <input type="checkbox" lw-model="rememberMe" lw-on:change="onRememberMeChange()">
           <span>Remember me</span>
         </label>
-        <div class="ui-row sm">
-          <button class="ui-btn block" lw-class:loading="emailLoading" lw-on:click="loginWithEmail()">Login with Email</button>
-          <button class="ui-btn outline success block" lw-class:loading="passkeyLoading" lw-on:click="loginWithPasskey()">Login with Passkey</button>
+        <div class="ui-stack sm">
+          <button lw-if="savedEmail" class="ui-btn block" lw-class:loading="passkeyLoading" lw-on:click="loginWithPasskey()"><i class="ui-icon ui-icon-passkey"></i> Login with Passkey</button>
+          <button lw-if="savedEmail" class="ui-btn ghost block" lw-class:loading="emailLoading" lw-on:click="loginWithEmail()"><i class="ui-icon ui-icon-mail"></i> Login with Email</button>
+          <button lw-if="!savedEmail" class="ui-btn block" lw-class:loading="emailLoading" lw-on:click="loginWithEmail()"><i class="ui-icon ui-icon-mail"></i> Login with Email</button>
+          <button lw-if="!savedEmail" class="ui-btn ghost block" lw-class:loading="passkeyLoading" lw-on:click="loginWithPasskey()"><i class="ui-icon ui-icon-passkey"></i> Login with Passkey</button>
         </div>
       </div>
 

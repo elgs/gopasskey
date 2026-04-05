@@ -299,12 +299,6 @@ func GetUserByEmail(email string) (*PasskeyUser, error) {
 }
 
 func SaveUser(user *PasskeyUser) error {
-	result, err := gosqlcrud.Update(db, user, "user")
-	if err != nil {
-		return err
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("no rows affected")
-	}
-	return nil
+	_, err := gosqlcrud.Update(db, user, "user")
+	return err
 }

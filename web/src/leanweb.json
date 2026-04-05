@@ -9,5 +9,5 @@
   "resources": [
     "resources/"
   ],
-  "shadowDom": true
+  "shadowDom": false
 }

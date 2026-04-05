@@ -1,7 +1,7 @@
 <div class="dashboard">
   <nav class="sidebar">
-    <div class="sidebar-header">GoPasskey</div>
-    <div class="ui-menu borderless sm sidebar-menu">
+    <div class="sidebar-header">az code lab</div>
+    <div class="ui-menu borderless sidebar-menu">
       <a class="ui-menu-item" lw-class:active="page === 'profile'" lw-on:click="navigate('profile')" href="#profile">
         <i class="ui-icon ui-icon-user"></i>
         <span>Profile</span>
@@ -10,18 +10,19 @@
         <i class="ui-icon ui-icon-passkey"></i>
         <span>Passkeys</span>
       </a>
+    </div>
+    <div class="ui-menu borderless">
       <hr class="ui-menu-divider">
-      <div lw class="ui-menu-label">email</div>
+      <div class="ui-menu-item" disabled><span lw>email</span></div>
       <a class="ui-menu-item danger" lw-on:click="logout()">
         <i class="ui-icon ui-icon-log-out"></i>
         <span>Logout</span>
       </a>
     </div>
+    <div class="resize-handle" lw-on:mousedown="onResizeStart($event)"></div>
   </nav>
 
   <main class="content">
-    <div lw lw-if="message" class="ui-alert sm">message</div>
-
     <!-- Profile -->
     <div lw-if="page === 'profile'" class="ui-panel flat">
       <div class="ui-panel-header">
@@ -53,42 +54,46 @@
       <div class="ui-panel-header">
         <h3 class="ui-panel-title">Passkeys</h3>
         <div class="ui-panel-actions">
-          <button class="ui-btn success sm" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
+          <button class="ui-btn sm" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
         </div>
       </div>
-      <div class="ui-panel-body">
-        <div lw-if="credentials.length === 0" class="ui-empty sm">
+      <div lw-if="credentialsLoaded && credentials.length === 0" class="ui-panel-body">
+        <div class="ui-empty sm">
           <div class="ui-empty-icon"><i class="ui-icon ui-icon-passkey"></i></div>
           <p class="ui-empty-description">No passkeys registered.</p>
           <div class="ui-empty-actions">
-            <button class="ui-btn success sm" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
+            <button class="ui-btn sm" lw-class:loading="registerLoading" lw-on:click="registerPasskey()">Add Passkey</button>
           </div>
         </div>
-        <table lw-if="credentials.length > 0" class="ui-table">
-          <thead>
-            <tr>
-              <th>Authenticator</th>
-              <th>Label</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr lw-for="cred in credentials">
-              <td class="authenticator-cell">
+      </div>
+      <table lw-if="credentials.length > 0" class="ui-table borderless">
+        <thead>
+          <tr>
+            <th>Authenticator</th>
+            <th>Label</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr lw-for="cred in credentials">
+            <td>
+              <div class="authenticator-cell">
                 <img lw-if="aaguidIcon(cred.aaguid)" lw-bind:src="aaguidIcon(cred.aaguid)" class="aaguid-icon">
                 <span lw>aaguidName(cred.aaguid)</span>
-              </td>
-              <td lw>parseUserAgent(cred.label)</td>
-              <td lw>cred.created</td>
-              <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </div>
+            </td>
+            <td lw>parseUserAgent(cred.label)</td>
+            <td lw>cred.created</td>
+            <td class="action-cell"><button class="ui-btn outline danger sm" lw-on:click="deleteCredential(cred.id)">Delete</button></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </main>
 </div>
+
+<div class="ui-toast-container top-center"></div>
 
 <!-- Confirmation dialog -->
 <dialog class="ui-dialog sm confirm-dialog">
